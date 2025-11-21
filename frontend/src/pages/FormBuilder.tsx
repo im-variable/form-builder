@@ -20,12 +20,16 @@ import {
   ActionIcon,
   Loader,
   Modal,
+  Grid,
+  ScrollArea,
+  Divider,
+  Radio,
+  Switch,
+  Rating,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye } from '@tabler/icons-react'
 import { builderAPI, Form, Page, Field } from '../services/api'
-
-type BuilderStep = 'form' | 'pages' | 'fields' | 'complete'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
@@ -86,6 +90,9 @@ function FormBuilder() {
   // Delete modal state
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false)
   const [deletingForm, setDeletingForm] = useState(false)
+  
+  // Preview modal state
+  const [previewModalOpened, { open: openPreviewModal, close: closePreviewModal }] = useDisclosure(false)
 
   // Load form data when editing
   useEffect(() => {
@@ -207,7 +214,9 @@ function FormBuilder() {
   const loadFields = async (pageId: number) => {
     try {
       const pageFields = await builderAPI.getFields(pageId)
-      setFields(pageFields)
+      // Sort fields by order to ensure correct display
+      const sortedFields = [...pageFields].sort((a, b) => (a.order || 0) - (b.order || 0))
+      setFields(sortedFields)
     } catch (err: any) {
       console.error('Error loading fields:', err)
     }
@@ -217,9 +226,88 @@ function FormBuilder() {
     if (!currentForm) return
     try {
       const formPages = await builderAPI.getPages(currentForm.id)
-      setPages(formPages)
+      // Sort pages: first page always on top, then others by order
+      const sortedPages = [...formPages].sort((a, b) => {
+        // If one is first page, it should come first
+        if (a.is_first && !b.is_first) return -1
+        if (!a.is_first && b.is_first) return 1
+        // Otherwise sort by order
+        return (a.order || 0) - (b.order || 0)
+      })
+      setPages(sortedPages)
     } catch (err: any) {
       console.error('Error loading pages:', err)
+    }
+  }
+
+  const handleMovePage = async (pageId: number, direction: 'up' | 'down') => {
+    const pageIndex = pages.findIndex(p => p.id === pageId)
+    if (pageIndex === -1) return
+
+    const currentPage = pages[pageIndex]
+    
+    // Don't allow moving the first page
+    if (currentPage.is_first) {
+      setError('The first page cannot be reordered')
+      return
+    }
+
+    const newIndex = direction === 'up' ? pageIndex - 1 : pageIndex + 1
+    if (newIndex < 0 || newIndex >= pages.length) return
+
+    const targetPage = pages[newIndex]
+    
+    // Don't allow swapping with the first page
+    if (targetPage.is_first) {
+      setError('Cannot move pages before the first page')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Swap the order values
+      const tempOrder = currentPage.order || pageIndex + 1
+      const targetOrder = targetPage.order || newIndex + 1
+
+      // Update both pages
+      await builderAPI.updatePage(currentPage.id, { order: targetOrder })
+      await builderAPI.updatePage(targetPage.id, { order: tempOrder })
+
+      // Reload pages to get updated order
+      if (currentForm) {
+        await loadPages()
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to reorder page')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeletePage = async (pageId: number) => {
+    if (!confirm('Are you sure you want to delete this page? All fields in this page will also be deleted.')) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+      await builderAPI.deletePage(pageId)
+      // Reload pages after deletion
+      if (currentForm) {
+        await loadPages()
+      }
+      // If we deleted the current page, clear it
+      if (currentPage && currentPage.id === pageId) {
+        setCurrentPage(null)
+        setFields([])
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete page')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -319,9 +407,45 @@ function FormBuilder() {
     }
   }
 
+  const handleMoveField = async (fieldId: number, direction: 'up' | 'down') => {
+    const fieldIndex = fields.findIndex(f => f.id === fieldId)
+    if (fieldIndex === -1) return
+
+    const newIndex = direction === 'up' ? fieldIndex - 1 : fieldIndex + 1
+    if (newIndex < 0 || newIndex >= fields.length) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Swap the order values
+      const currentField = fields[fieldIndex]
+      const targetField = fields[newIndex]
+      const tempOrder = currentField.order || fieldIndex + 1
+      const targetOrder = targetField.order || newIndex + 1
+
+      // Update both fields
+      await builderAPI.updateField(currentField.id, { order: targetOrder })
+      await builderAPI.updateField(targetField.id, { order: tempOrder })
+
+      // Reload fields to get updated order
+      if (currentPage) {
+        await loadFields(currentPage.id)
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to reorder field')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleCreateField = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!currentPage || !fieldName.trim() || !fieldLabel.trim()) {
+    if (!currentPage) {
+      setError('Please select a page first')
+      return
+    }
+    if (!fieldName.trim() || !fieldLabel.trim()) {
       setError('Field name and label are required')
       return
     }
@@ -444,10 +568,21 @@ function FormBuilder() {
         </div>
 
         {/* Stepper */}
-        <Stepper active={activeStep} onStepClick={setActiveStep} breakpoint="sm">
+        <Stepper active={activeStep} onStepClick={(step) => {
+          // Prevent going to Fields step if no pages exist
+          if (step === 2 && pages.length === 0) {
+            setError('Please create at least one page before adding fields')
+            return
+          }
+          // Auto-select first page when going to Fields step if pages exist but none selected
+          if (step === 2 && pages.length > 0 && !currentPage) {
+            handlePageSelect(pages[0])
+          }
+          setActiveStep(step)
+        }}>
           <Stepper.Step label="Form" description={isEditMode ? "Edit form" : "Create form"} />
           <Stepper.Step label="Pages" description="Add pages" />
-          <Stepper.Step label="Fields" description="Add fields" />
+          <Stepper.Step label="Fields" description="Add fields" disabled={pages.length === 0} />
           <Stepper.Completed>Completed! Form is ready.</Stepper.Completed>
         </Stepper>
 
@@ -503,144 +638,271 @@ function FormBuilder() {
 
         {/* Step 2: Create Pages */}
         {activeStep === 1 && currentForm && (
-          <Card shadow="md" padding="xl" radius="md" withBorder>
-            <Title order={2} mb="lg">Add Pages to "{currentForm.title}"</Title>
-            <form onSubmit={handleCreatePage}>
-              <Stack gap="md">
-                <TextInput
-                  label="Page Title"
-                  placeholder="e.g., Basic Information"
-                  value={pageTitle}
-                  onChange={(e) => setPageTitle(e.currentTarget.value)}
-                  required
-                  size="md"
-                />
-                <Textarea
-                  label="Description"
-                  placeholder="Page description"
-                  value={pageDescription}
-                  onChange={(e) => setPageDescription(e.currentTarget.value)}
-                  rows={2}
-                  size="md"
-                />
-                <Checkbox
-                  label="Mark as first page"
-                  description={pages.some(p => p.is_first) ? "Note: This will unmark the current first page" : "This will be the starting page of the form"}
-                  checked={isFirstPage}
-                  onChange={(e) => setIsFirstPage(e.currentTarget.checked)}
-                />
-                <Group>
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 8 }}>
+              <Card shadow="md" padding="xl" radius="md" withBorder>
+                <Group mb="lg">
                   <Button
-                    type="submit"
-                    loading={loading}
-                    leftSection={<IconPlus size={18} />}
-                    variant="gradient"
-                    gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                    variant="light"
+                    onClick={() => setActiveStep(0)}
+                    leftSection={<IconArrowLeft size={18} />}
                   >
-                    Add Page
+                    Back to Form
                   </Button>
-                  {pages.length > 0 && (
-                    <Button
-                      variant="light"
-                      onClick={() => setActiveStep(2)}
-                    >
-                      Next: Add Fields
-                    </Button>
-                  )}
                 </Group>
-              </Stack>
-            </form>
-            {pages.length > 0 && (
-              <Stack gap="md" mt="xl">
-                <Title order={4}>Pages Created:</Title>
-                {pages.map((page) => (
-                  <Paper key={page.id} p="md" withBorder>
-                    <Group justify="space-between">
-                      <div>
-                        <Text fw={500}>{page.title}</Text>
-                        {page.is_first && (
-                          <Badge color="indigo" variant="light" size="sm" mt="xs">
-                            First Page
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        size="xs"
-                        variant="light"
-                        onClick={() => handlePageSelect(page)}
-                      >
-                        Add Fields
-                      </Button>
-                    </Group>
-                  </Paper>
-                ))}
-              </Stack>
-            )}
-          </Card>
+                <Title order={2} mb="lg">Add Pages to "{currentForm.title}"</Title>
+                <form onSubmit={handleCreatePage}>
+                  <Stack gap="md">
+                    <TextInput
+                      label="Page Title"
+                      placeholder="e.g., Basic Information"
+                      value={pageTitle}
+                      onChange={(e) => setPageTitle(e.currentTarget.value)}
+                      required
+                      size="md"
+                    />
+                    <Textarea
+                      label="Description"
+                      placeholder="Page description"
+                      value={pageDescription}
+                      onChange={(e) => setPageDescription(e.currentTarget.value)}
+                      rows={2}
+                      size="md"
+                    />
+                    <Checkbox
+                      label="Mark as first page"
+                      description={pages.some(p => p.is_first) ? "Note: This will unmark the current first page" : "This will be the starting page of the form"}
+                      checked={isFirstPage}
+                      onChange={(e) => setIsFirstPage(e.currentTarget.checked)}
+                    />
+                    <Button
+                      type="submit"
+                      loading={loading}
+                      leftSection={<IconPlus size={18} />}
+                      variant="gradient"
+                      gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                      fullWidth
+                    >
+                      Add Page
+                    </Button>
+                  </Stack>
+                </form>
+              </Card>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 4 }}>
+              <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
+                <Stack gap="md">
+                  <Group justify="space-between">
+                    <Title order={4}>Pages ({pages.length})</Title>
+                  </Group>
+                  <Divider />
+                  {pages.length === 0 ? (
+                    <Text size="sm" c="dimmed" ta="center" py="xl">
+                      No pages added yet
+                    </Text>
+                  ) : (
+                    <ScrollArea h={600}>
+                      <Stack gap="xs">
+                        {pages.map((page, index) => (
+                          <Paper 
+                            key={page.id} 
+                            p="sm" 
+                            withBorder
+                            style={{ 
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
+                              e.currentTarget.style.borderColor = 'var(--mantine-color-indigo-4)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.borderColor = 'var(--mantine-color-gray-4)'
+                            }}
+                          >
+                            <Group gap="xs" wrap="nowrap">
+                              {!page.is_first && (
+                                <Stack gap={2}>
+                                  <ActionIcon
+                                    color="gray"
+                                    variant="light"
+                                    onClick={() => handleMovePage(page.id, 'up')}
+                                    disabled={index === 1 || loading || pages[index - 1]?.is_first}
+                                    size="xs"
+                                    title="Move up"
+                                  >
+                                    <IconArrowUp size={12} />
+                                  </ActionIcon>
+                                  <ActionIcon
+                                    color="gray"
+                                    variant="light"
+                                    onClick={() => handleMovePage(page.id, 'down')}
+                                    disabled={index === pages.length - 1 || loading}
+                                    size="xs"
+                                    title="Move down"
+                                  >
+                                    <IconArrowDown size={12} />
+                                  </ActionIcon>
+                                </Stack>
+                              )}
+                              {page.is_first && (
+                                <div style={{ width: 24 }} />
+                              )}
+                              <div 
+                                style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                                onClick={() => handlePageSelect(page)}
+                              >
+                                <Text fw={500} size="sm" truncate>{page.title}</Text>
+                                {page.description && (
+                                  <Text size="xs" c="dimmed" truncate mt={2}>{page.description}</Text>
+                                )}
+                                <Group gap={4} mt={4}>
+                                  {page.is_first && (
+                                    <Badge color="indigo" variant="light" size="xs">First (Fixed)</Badge>
+                                  )}
+                                </Group>
+                              </div>
+                              <Group gap={2}>
+                                <ActionIcon
+                                  color="blue"
+                                  variant="light"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handlePageSelect(page)
+                                  }}
+                                  size="sm"
+                                  title="Add/Edit Fields"
+                                >
+                                  <IconEdit size={14} />
+                                </ActionIcon>
+                                <ActionIcon
+                                  color="red"
+                                  variant="light"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeletePage(page.id)
+                                  }}
+                                  disabled={loading}
+                                  size="sm"
+                                  title="Delete Page"
+                                >
+                                  <IconTrash size={14} />
+                                </ActionIcon>
+                              </Group>
+                            </Group>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    </ScrollArea>
+                  )}
+                </Stack>
+              </Card>
+            </Grid.Col>
+          </Grid>
         )}
 
         {/* Step 3: Create Fields */}
-        {activeStep === 2 && currentPage && currentForm && (
+        {activeStep === 2 && currentForm && (
           <Card shadow="md" padding="xl" radius="md" withBorder>
-            <Group justify="space-between" mb="lg">
-              <Title order={2}>Add Fields to "{currentPage.title}"</Title>
-              {pages.length > 1 && (
+            <Group mb="lg">
+              <Button
+                variant="light"
+                onClick={() => {
+                  setActiveStep(1)
+                  setCurrentPage(null)
+                  setFields([])
+                }}
+                leftSection={<IconArrowLeft size={18} />}
+              >
+                Back to Pages
+              </Button>
+            </Group>
+            {pages.length === 0 ? (
+              <Stack gap="md" align="center" py="xl">
+                <Alert icon={<IconAlertCircle size={20} />} title="No Pages Available" color="yellow">
+                  You need to create at least one page before adding fields.
+                </Alert>
+                <Button
+                  variant="light"
+                  onClick={() => setActiveStep(1)}
+                  leftSection={<IconArrowLeft size={18} />}
+                >
+                  Go Back to Add Pages
+                </Button>
+              </Stack>
+            ) : !currentPage ? (
+              <Stack gap="md">
+                <Alert icon={<IconAlertCircle size={20} />} title="Select a Page" color="blue">
+                  Please select a page to add fields to.
+                </Alert>
                 <Select
-                  value={currentPage.id.toString()}
+                  label="Select Page"
+                  placeholder="Choose a page"
+                  value={null}
                   onChange={(val) => {
                     const page = pages.find((p) => p.id === parseInt(val || '0'))
-                    if (page) handlePageSelect(page)
+                    if (page) {
+                      handlePageSelect(page)
+                    }
                   }}
                   data={pages.map((page) => ({
                     value: page.id.toString(),
-                    label: page.title,
+                    label: page.title + (page.is_first ? ' (First Page)' : ''),
                   }))}
-                  style={{ width: 200 }}
-                />
-              )}
-            </Group>
-            <form onSubmit={handleCreateField}>
-              <Stack gap="md">
-                <Group grow>
-                  <TextInput
-                    label="Field Name"
-                    placeholder="e.g., email, age"
-                    value={fieldName}
-                    onChange={(e) => setFieldName(e.currentTarget.value)}
-                    required
-                    size="md"
-                  />
-                  <TextInput
-                    label="Field Label"
-                    placeholder="e.g., Email Address"
-                    value={fieldLabel}
-                    onChange={(e) => setFieldLabel(e.currentTarget.value)}
-                    required
-                    size="md"
-                  />
-                </Group>
-                <Select
-                  label="Field Type"
-                  value={fieldType}
-                  onChange={(val) => handleFieldTypeChange(val || 'text')}
-                  data={FIELD_TYPES}
-                  required
                   size="md"
                 />
-                <TextInput
-                  label="Placeholder"
-                  placeholder="Enter placeholder text"
-                  value={fieldPlaceholder}
-                  onChange={(e) => setFieldPlaceholder(e.currentTarget.value)}
-                  size="md"
-                />
-                <TextInput
-                  label="Help Text"
-                  placeholder="Additional help text"
-                  value={fieldHelpText}
-                  onChange={(e) => setFieldHelpText(e.currentTarget.value)}
-                  size="md"
-                />
+              </Stack>
+            ) : (
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 8 }}>
+                  <form onSubmit={handleCreateField}>
+                  <Stack gap="md">
+                    <Group grow>
+                      <TextInput
+                        label="Field Name"
+                        placeholder="e.g., email, age"
+                        value={fieldName}
+                        onChange={(e) => setFieldName(e.currentTarget.value)}
+                        required
+                        size="md"
+                        disabled={!currentPage}
+                      />
+                      <TextInput
+                        label="Field Label"
+                        placeholder="e.g., Email Address"
+                        value={fieldLabel}
+                        onChange={(e) => setFieldLabel(e.currentTarget.value)}
+                        required
+                        size="md"
+                        disabled={!currentPage}
+                      />
+                    </Group>
+                    <Select
+                      label="Field Type"
+                      value={fieldType}
+                      onChange={(val) => handleFieldTypeChange(val || 'text')}
+                      data={FIELD_TYPES}
+                      required
+                      size="md"
+                      disabled={!currentPage}
+                    />
+                    <TextInput
+                      label="Placeholder"
+                      placeholder="Enter placeholder text"
+                      value={fieldPlaceholder}
+                      onChange={(e) => setFieldPlaceholder(e.currentTarget.value)}
+                      size="md"
+                      disabled={!currentPage}
+                    />
+                    <TextInput
+                      label="Help Text"
+                      placeholder="Additional help text"
+                      value={fieldHelpText}
+                      onChange={(e) => setFieldHelpText(e.currentTarget.value)}
+                      size="md"
+                      disabled={!currentPage}
+                    />
 
                 {/* Options UI for select/radio/checkbox */}
                 {(fieldType === 'select' || fieldType === 'radio' || fieldType === 'checkbox') && (
@@ -729,22 +991,24 @@ function FormBuilder() {
                   </Paper>
                 )}
 
-                <Checkbox
-                  label="Required field"
-                  checked={fieldRequired}
-                  onChange={(e) => setFieldRequired(e.currentTarget.checked)}
-                />
+                    <Checkbox
+                      label="Required field"
+                      checked={fieldRequired}
+                      onChange={(e) => setFieldRequired(e.currentTarget.checked)}
+                      disabled={!currentPage}
+                    />
 
-                <Group>
-                  <Button
-                    type="submit"
-                    loading={loading}
-                    leftSection={editingFieldId ? <IconCheck size={18} /> : <IconPlus size={18} />}
-                    variant="gradient"
-                    gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
-                  >
-                    {editingFieldId ? 'Update Field' : 'Add Field'}
-                  </Button>
+                    <Group>
+                      <Button
+                        type="submit"
+                        loading={loading}
+                        leftSection={editingFieldId ? <IconCheck size={18} /> : <IconPlus size={18} />}
+                        variant="gradient"
+                        gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                        disabled={!currentPage}
+                      >
+                        {editingFieldId ? 'Update Field' : 'Add Field'}
+                      </Button>
                   {editingFieldId && (
                     <Button
                       variant="light"
@@ -755,9 +1019,14 @@ function FormBuilder() {
                   )}
                   <Button
                     variant="light"
-                    onClick={() => setActiveStep(1)}
+                    onClick={() => {
+                      setActiveStep(1)
+                      setCurrentPage(null)
+                      setFields([])
+                    }}
+                    leftSection={<IconArrowLeft size={18} />}
                   >
-                    Add More Pages
+                    Back to Pages
                   </Button>
                   <Button
                     variant="gradient"
@@ -770,57 +1039,93 @@ function FormBuilder() {
                     Finish
                   </Button>
                 </Group>
-              </Stack>
-            </form>
-            {fields.length > 0 && (
-              <Stack gap="md" mt="xl">
-                <Title order={4}>Fields Added:</Title>
-                {fields.map((field) => (
-                  <Paper 
-                    key={field.id} 
-                    p="md" 
-                    withBorder
-                    style={{ 
-                      borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
-                      borderWidth: editingFieldId === field.id ? 2 : undefined
-                    }}
-                  >
-                    <Group justify="space-between">
-                      <div>
-                        <Text fw={500}>{field.label}</Text>
-                        <Text size="xs" c="dimmed" mt={2}>{field.name}</Text>
-                        <Group gap="xs" mt={4}>
-                          <Badge variant="light" size="sm">{field.field_type}</Badge>
-                          {field.is_required && (
-                            <Badge color="red" variant="light" size="sm">Required</Badge>
-                          )}
-                          {editingFieldId === field.id && (
-                            <Badge color="indigo" variant="light" size="sm">Editing</Badge>
-                          )}
-                        </Group>
-                      </div>
-                      <Group gap="xs">
-                        <ActionIcon
-                          color="blue"
-                          variant="light"
-                          onClick={() => handleEditField(field)}
-                          disabled={editingFieldId === field.id}
-                        >
-                          <IconEdit size={18} />
-                        </ActionIcon>
-                        <ActionIcon
-                          color="red"
-                          variant="light"
-                          onClick={() => handleDeleteField(field.id)}
-                          disabled={loading}
-                        >
-                          <IconTrash size={18} />
-                        </ActionIcon>
+                  </Stack>
+                  </form>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 4 }}>
+                  <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
+                    <Stack gap="md">
+                      <Group justify="space-between">
+                        <Title order={4}>Fields ({fields.length})</Title>
                       </Group>
-                    </Group>
-                  </Paper>
-                ))}
-              </Stack>
+                      <Divider />
+                      {fields.length === 0 ? (
+                        <Text size="sm" c="dimmed" ta="center" py="xl">
+                          No fields added yet
+                        </Text>
+                      ) : (
+                        <ScrollArea h={600}>
+                          <Stack gap="xs">
+                            {fields.map((field, index) => (
+                              <Paper 
+                                key={field.id} 
+                                p="sm" 
+                                withBorder
+                                style={{ 
+                                  borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
+                                  borderWidth: editingFieldId === field.id ? 2 : undefined
+                                }}
+                              >
+                                <Group gap="xs" wrap="nowrap">
+                                  <Stack gap={2}>
+                                    <ActionIcon
+                                      color="gray"
+                                      variant="light"
+                                      onClick={() => handleMoveField(field.id, 'up')}
+                                      disabled={index === 0 || loading}
+                                      size="xs"
+                                    >
+                                      <IconArrowUp size={12} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      color="gray"
+                                      variant="light"
+                                      onClick={() => handleMoveField(field.id, 'down')}
+                                      disabled={index === fields.length - 1 || loading}
+                                      size="xs"
+                                    >
+                                      <IconArrowDown size={12} />
+                                    </ActionIcon>
+                                  </Stack>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <Text fw={500} size="sm" truncate>{field.label}</Text>
+                                    <Group gap={4} mt={4}>
+                                      <Badge variant="light" size="xs">{field.field_type}</Badge>
+                                      {field.is_required && (
+                                        <Badge color="red" variant="light" size="xs">Required</Badge>
+                                      )}
+                                    </Group>
+                                  </div>
+                                  <Group gap={2}>
+                                    <ActionIcon
+                                      color="blue"
+                                      variant="light"
+                                      onClick={() => handleEditField(field)}
+                                      disabled={editingFieldId === field.id}
+                                      size="sm"
+                                    >
+                                      <IconEdit size={14} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      color="red"
+                                      variant="light"
+                                      onClick={() => handleDeleteField(field.id)}
+                                      disabled={loading}
+                                      size="sm"
+                                    >
+                                      <IconTrash size={14} />
+                                    </ActionIcon>
+                                  </Group>
+                                </Group>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        </ScrollArea>
+                      )}
+                    </Stack>
+                  </Card>
+                </Grid.Col>
+              </Grid>
             )}
           </Card>
         )}
@@ -900,6 +1205,129 @@ function FormBuilder() {
               </Button>
             </Group>
           </Stack>
+        </Modal>
+
+        {/* Preview Modal */}
+        <Modal
+          opened={previewModalOpened}
+          onClose={closePreviewModal}
+          title={`Preview: ${currentForm?.title || 'Form'}`}
+          size="xl"
+          centered
+        >
+          {currentForm && pages.length > 0 && (
+            <Stack gap="md">
+              <Text size="sm" c="dimmed">
+                This is how your form will appear to users. Fields are shown in their current order.
+              </Text>
+              <Divider />
+              {pages.map((page) => {
+                // For preview, we'll show fields for the current page being edited
+                // In a full implementation, you'd load fields for each page
+                const pageFields = currentPage && currentPage.id === page.id 
+                  ? fields.sort((a, b) => (a.order || 0) - (b.order || 0))
+                  : [];
+                
+                return (
+                  <Card key={page.id} shadow="sm" padding="md" radius="md" withBorder>
+                    <Stack gap="md">
+                      <div>
+                        <Title order={3}>{page.title}</Title>
+                        {page.description && (
+                          <Text size="sm" c="dimmed" mt="xs">{page.description}</Text>
+                        )}
+                      </div>
+                      <Stack gap="md">
+                        {pageFields.length === 0 ? (
+                          <Text size="sm" c="dimmed" ta="center" py="md">
+                            No fields added to this page yet
+                          </Text>
+                        ) : (
+                          pageFields.map((field) => (
+                            <div key={field.id}>
+                              <Text fw={500} size="sm" mb="xs">
+                                {field.label}
+                                {field.is_required && <Text component="span" c="red"> *</Text>}
+                              </Text>
+                              {field.help_text && (
+                                <Text size="xs" c="dimmed" mb="xs">{field.help_text}</Text>
+                              )}
+                              {(() => {
+                                switch (field.field_type) {
+                                  case 'text':
+                                  case 'email':
+                                  case 'phone':
+                                    return <TextInput placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`} disabled size="sm" />;
+                                  case 'textarea':
+                                    return <Textarea placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`} disabled rows={3} size="sm" />;
+                                  case 'number':
+                                    return <NumberInput placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`} disabled size="sm" />;
+                                  case 'select':
+                                    return (
+                                      <Select
+                                        placeholder={field.placeholder || `Select ${field.label.toLowerCase()}`}
+                                        data={field.options?.choices?.map((c: any) => c.label) || []}
+                                        disabled
+                                        size="sm"
+                                      />
+                                    );
+                                  case 'radio':
+                                    return (
+                                      <Radio.Group>
+                                        <Stack gap="xs">
+                                          {field.options?.choices?.map((choice: any, idx: number) => (
+                                            <Radio key={idx} label={choice.label} value={choice.value} disabled />
+                                          ))}
+                                        </Stack>
+                                      </Radio.Group>
+                                    );
+                                  case 'checkbox':
+                                    return (
+                                      <Checkbox.Group>
+                                        <Stack gap="xs">
+                                          {field.options?.choices?.map((choice: any, idx: number) => (
+                                            <Checkbox key={idx} label={choice.label} value={choice.value} disabled />
+                                          ))}
+                                        </Stack>
+                                      </Checkbox.Group>
+                                    );
+                                  case 'boolean':
+                                    return <Switch label={field.label} disabled />;
+                                  case 'rating':
+                                    return (
+                                      <Rating
+                                        value={0}
+                                        count={field.options?.max || 5}
+                                        readOnly
+                                      />
+                                    );
+                                  default:
+                                    return <TextInput placeholder={field.placeholder} disabled size="sm" />;
+                                }
+                              })()}
+                            </div>
+                          ))
+                        )}
+                      </Stack>
+                    </Stack>
+                  </Card>
+                );
+              })}
+              <Group justify="flex-end" mt="md">
+                <Button onClick={closePreviewModal}>Close Preview</Button>
+                {currentForm && (
+                  <Button
+                    component={Link}
+                    to={`/form/${currentForm.id}`}
+                    variant="gradient"
+                    gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                  >
+                    View Live Form
+                  </Button>
+                )}
+              </Group>
+            </Stack>
+          )}
         </Modal>
       </Stack>
     </Container>

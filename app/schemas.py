@@ -185,7 +185,7 @@ class RenderedField(BaseModel):
     default_value: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
     validation_rules: Optional[Dict[str, Any]] = None
-    current_value: Optional[str] = None  # If already answered
+    current_value: Optional[Union[str, int, float, bool, List[str]]] = None  # If already answered (can be various types)
 
 
 class RenderedPage(BaseModel):

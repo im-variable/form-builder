@@ -24,7 +24,7 @@ export interface Page {
   form_id: number
   title: string
   description?: string
-  order: number
+  order?: number
   is_first: boolean
 }
 
@@ -35,6 +35,7 @@ export interface Field {
   field_type: string
   placeholder?: string
   help_text?: string
+  order?: number
   is_required: boolean
   is_visible: boolean
   default_value?: string
@@ -103,11 +104,14 @@ export const formAPI = {
     sessionId: string,
     currentAnswers?: Record<string, any>
   ): Promise<FormRenderResponse> => {
-    const response = await api.post('/renderer/render', {
+    const payload: any = {
       form_id: formId,
       session_id: sessionId,
-      current_answers: currentAnswers || {},
-    })
+    }
+    if (currentAnswers !== undefined) {
+      payload.current_answers = currentAnswers
+    }
+    const response = await api.post('/renderer/render', payload)
     return response.data
   },
 

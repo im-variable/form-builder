@@ -88,11 +88,14 @@ function FormView() {
         }
       }
 
-      const updatedForm = await formAPI.renderForm(parseInt(formId!), sessionId, answers)
+      // After submitting, render form again to get the next page
+      // Don't pass answers - let it get from database to ensure we have the latest state
+      const updatedForm = await formAPI.renderForm(parseInt(formId!), sessionId)
 
       if (updatedForm.is_complete) {
         await formAPI.completeSubmission(sessionId)
-        navigate(`/form/${formId}/complete`)
+        // Navigate to home page to view all forms
+        navigate('/')
       } else if (updatedForm.next_page_id) {
         setFormData(updatedForm)
         setAnswers({})
@@ -196,11 +199,17 @@ function FormView() {
               <Button
                 type="submit"
                 loading={submitting}
-                rightSection={!submitting && <IconArrowRight size={18} />}
+                rightSection={!submitting && (formData.is_complete || !formData.next_page_id) ? <IconCheck size={18} /> : <IconArrowRight size={18} />}
                 variant="gradient"
                 gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
               >
-                {submitting ? 'Submitting...' : formData.is_complete ? 'Complete' : 'Next'}
+                {submitting 
+                  ? 'Submitting...' 
+                  : formData.is_complete
+                    ? 'Submit' 
+                    : formData.next_page_id
+                      ? 'Next'
+                      : 'Submit'}
               </Button>
             </Group>
           </form>

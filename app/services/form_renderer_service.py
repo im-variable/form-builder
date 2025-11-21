@@ -56,9 +56,14 @@ class FormRendererService:
             db.add(submission)
             db.commit()
             db.refresh(submission)
+        else:
+            # Refresh submission to get latest current_page_id
+            db.refresh(submission)
 
         # Get current answers
-        if current_answers is None:
+        # If current_answers is None or empty, get from database
+        # This ensures we have the latest state after submissions
+        if current_answers is None or (isinstance(current_answers, dict) and len(current_answers) == 0):
             current_answers = FormRendererService.get_current_answers(db, session_id)
 
         # Determine current page
@@ -132,20 +137,38 @@ class FormRendererService:
 
         # Determine next page
         navigation_rules = current_page.navigation_rules
-        next_page_id = ConditionEngine.determine_next_page(
-            current_page.id,
-            navigation_rules,
-            current_answers,
-            db
-        )
+        next_page_id = None
+        
+        if navigation_rules:
+            # Use navigation rules to determine next page
+            next_page_id = ConditionEngine.determine_next_page(
+                current_page.id,
+                navigation_rules,
+                current_answers,
+                db
+            )
+        else:
+            # No navigation rules, go to next page by order
+            # Sort pages: first page always first, then others by order
+            all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+            sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+            current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), -1)
+            
+            if current_page_index >= 0 and current_page_index < len(sorted_pages) - 1:
+                # There's a next page
+                next_page_id = sorted_pages[current_page_index + 1].id
+            # else: next_page_id remains None (last page)
 
         # Calculate progress
-        all_pages = db.query(Page).filter(Page.form_id == form_id).order_by(Page.order).all()
-        total_pages = len(all_pages)
-        current_page_index = next((i for i, p in enumerate(all_pages) if p.id == current_page.id), 0)
+        # Sort pages: first page always first, then others by order
+        all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+        sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+        total_pages = len(sorted_pages)
+        current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), 0)
         progress = ((current_page_index + 1) / total_pages * 100) if total_pages > 0 else 0
 
-        is_complete = next_page_id is None and len(navigation_rules) > 0
+        # Form is complete if there's no next page
+        is_complete = next_page_id is None
 
         return FormRenderResponse(
             form_id=form_id,

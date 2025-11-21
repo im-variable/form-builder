@@ -116,13 +116,14 @@ class SubmissionService:
                 is_complete = next_page_id is None
             else:
                 # No navigation rules, go to next page by order
-                next_page = db.query(Page).filter(
-                    Page.form_id == submission.form_id,
-                    Page.order > current_page.order
-                ).order_by(Page.order).first()
+                # Sort pages: first page always first, then others by order
+                all_pages = db.query(Page).filter(Page.form_id == submission.form_id).all()
+                sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+                current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), -1)
                 
-                if next_page:
-                    next_page_id = next_page.id
+                if current_page_index >= 0 and current_page_index < len(sorted_pages) - 1:
+                    # There's a next page
+                    next_page_id = sorted_pages[current_page_index + 1].id
                 else:
                     is_complete = True
 
