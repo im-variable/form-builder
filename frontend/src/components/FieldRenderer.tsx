@@ -1,3 +1,4 @@
+import { TextInput, Textarea, NumberInput, Select, Radio, Checkbox, Switch, Rating, Stack, Text } from '@mantine/core'
 import { Field } from '../services/api'
 
 interface FieldRendererProps {
@@ -7,230 +8,157 @@ interface FieldRendererProps {
 }
 
 function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const newValue = e.target.value
-    onChange(newValue)
-  }
-
-  const handleCheckboxChange = (optionValue: string, checked: boolean) => {
-    const currentValues = Array.isArray(value) ? value : []
-    if (checked) {
-      onChange([...currentValues, optionValue])
-    } else {
-      onChange(currentValues.filter((v) => v !== optionValue))
-    }
-  }
-
   const renderField = () => {
     switch (field.field_type) {
       case 'text':
       case 'email':
       case 'phone':
         return (
-          <input
+          <TextInput
             type={field.field_type === 'email' ? 'email' : field.field_type === 'phone' ? 'tel' : 'text'}
-            id={field.name}
-            name={field.name}
             value={value || ''}
-            onChange={handleChange}
+            onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
             required={field.is_required}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            size="md"
           />
         )
 
       case 'textarea':
         return (
-          <textarea
-            id={field.name}
-            name={field.name}
+          <Textarea
             value={value || ''}
-            onChange={handleChange}
+            onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
             required={field.is_required}
             rows={4}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            size="md"
           />
         )
 
       case 'number':
         return (
-          <input
-            type="number"
-            id={field.name}
-            name={field.name}
-            value={value || ''}
-            onChange={handleChange}
+          <NumberInput
+            value={value || undefined}
+            onChange={(val) => onChange(val)}
             placeholder={field.placeholder}
             required={field.is_required}
             min={field.validation_rules?.min}
             max={field.validation_rules?.max}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            size="md"
           />
         )
 
       case 'date':
         return (
-          <input
+          <TextInput
             type="date"
-            id={field.name}
-            name={field.name}
             value={value || ''}
-            onChange={handleChange}
+            onChange={(e) => onChange(e.target.value)}
             required={field.is_required}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            size="md"
           />
         )
 
       case 'datetime':
         return (
-          <input
+          <TextInput
             type="datetime-local"
-            id={field.name}
-            name={field.name}
             value={value || ''}
-            onChange={handleChange}
+            onChange={(e) => onChange(e.target.value)}
             required={field.is_required}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            size="md"
           />
         )
 
       case 'select':
         return (
-          <select
-            id={field.name}
-            name={field.name}
-            value={value || ''}
-            onChange={handleChange}
+          <Select
+            value={value || null}
+            onChange={(val) => onChange(val)}
+            placeholder="Select an option..."
             required={field.is_required}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
-          >
-            <option value="">Select an option...</option>
-            {field.options?.choices?.map((choice: any) => (
-              <option key={choice.value} value={choice.value}>
-                {choice.label}
-              </option>
-            ))}
-          </select>
+            data={field.options?.choices?.map((choice: any) => ({
+              value: choice.value,
+              label: choice.label,
+            })) || []}
+            size="md"
+          />
         )
 
       case 'radio':
         return (
-          <div className="space-y-3">
-            {field.options?.choices?.map((choice: any) => (
-              <label 
-                key={choice.value} 
-                className={`flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                  value === choice.value
-                    ? 'bg-indigo-50 border-indigo-500 shadow-md'
-                    : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={field.name}
+          <Radio.Group
+            value={value || ''}
+            onChange={onChange}
+            required={field.is_required}
+          >
+            <Stack gap="sm" mt="xs">
+              {field.options?.choices?.map((choice: any) => (
+                <Radio
+                  key={choice.value}
                   value={choice.value}
-                  checked={value === choice.value}
-                  onChange={handleChange}
-                  required={field.is_required}
-                  className="mr-3 w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  label={choice.label}
                 />
-                <span className={`font-medium ${value === choice.value ? 'text-indigo-900' : 'text-gray-700'}`}>
-                  {choice.label}
-                </span>
-              </label>
-            ))}
-          </div>
+              ))}
+            </Stack>
+          </Radio.Group>
         )
 
       case 'checkbox':
         return (
-          <div className="space-y-3">
-            {field.options?.choices?.map((choice: any) => {
-              const isChecked = Array.isArray(value) && value.includes(choice.value)
-              return (
-                <label 
-                  key={choice.value} 
-                  className={`flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                    isChecked
-                      ? 'bg-indigo-50 border-indigo-500 shadow-md'
-                      : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    value={choice.value}
-                    checked={isChecked}
-                    onChange={(e) => handleCheckboxChange(choice.value, e.target.checked)}
-                    className="mr-3 w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                  />
-                  <span className={`font-medium ${isChecked ? 'text-indigo-900' : 'text-gray-700'}`}>
-                    {choice.label}
-                  </span>
-                </label>
-              )
-            })}
-          </div>
+          <Checkbox.Group
+            value={Array.isArray(value) ? value : []}
+            onChange={(vals) => onChange(vals)}
+          >
+            <Stack gap="sm" mt="xs">
+              {field.options?.choices?.map((choice: any) => (
+                <Checkbox
+                  key={choice.value}
+                  value={choice.value}
+                  label={choice.label}
+                />
+              ))}
+            </Stack>
+          </Checkbox.Group>
         )
 
       case 'boolean':
-        const isChecked = value === true || value === 'true'
         return (
-          <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all w-fit ${
-            isChecked
-              ? 'bg-indigo-50 border-indigo-500 shadow-md'
-              : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
-          }`}>
-            <input
-              type="checkbox"
-              checked={isChecked}
-              onChange={(e) => onChange(e.target.checked)}
-              className="mr-3 w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-            />
-            <span className={`font-semibold ${isChecked ? 'text-indigo-900' : 'text-gray-700'}`}>
-              {isChecked ? 'Yes' : 'No'}
-            </span>
-          </label>
+          <Switch
+            checked={value === true || value === 'true'}
+            onChange={(e) => onChange(e.currentTarget.checked)}
+            label={value === true || value === 'true' ? 'Yes' : 'No'}
+            size="md"
+          />
         )
 
       case 'rating':
         const maxRating = field.options?.max || 5
         return (
-          <div className="flex items-center gap-3">
-            {Array.from({ length: maxRating }, (_, i) => i + 1).map((rating) => (
-              <button
-                key={rating}
-                type="button"
-                onClick={() => onChange(rating)}
-                className={`w-14 h-14 rounded-full border-2 flex items-center justify-center text-2xl transition-all ${
-                  value >= rating
-                    ? 'bg-gradient-to-br from-yellow-400 to-orange-400 border-yellow-500 shadow-lg scale-110'
-                    : 'bg-gray-100 border-gray-300 hover:border-yellow-300 hover:bg-yellow-50'
-                } transform hover:scale-110 cursor-pointer`}
-                title={`Rate ${rating} out of ${maxRating}`}
-              >
-                ⭐
-              </button>
-            ))}
+          <Stack gap="xs">
+            <Rating
+              value={value || 0}
+              onChange={onChange}
+              count={maxRating}
+              size="lg"
+            />
             {value && (
-              <span className="ml-4 text-lg font-semibold text-gray-700">
-                {value} / {maxRating}
-              </span>
+              <Text size="sm" c="dimmed">
+                {value} out of {maxRating} stars
+              </Text>
             )}
-          </div>
+          </Stack>
         )
 
       default:
         return (
-          <input
-            type="text"
-            id={field.name}
-            name={field.name}
+          <TextInput
             value={value || ''}
-            onChange={handleChange}
+            onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
             required={field.is_required}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            size="md"
           />
         )
     }
@@ -241,27 +169,19 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
   }
 
   return (
-    <div className="field-group bg-gray-50 rounded-xl p-6 border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all">
-      <label htmlFor={field.name} className="block text-sm font-semibold text-gray-900 mb-3">
+    <Stack gap="xs">
+      <Text fw={500} size="sm">
         {field.label}
-        {field.is_required && (
-          <span className="ml-2 text-red-500 font-bold" title="Required field">*</span>
-        )}
-      </label>
-      <div className="mb-2">
-        {renderField()}
-      </div>
+        {field.is_required && <Text component="span" c="red" fw={700}> *</Text>}
+      </Text>
+      {renderField()}
       {field.help_text && (
-        <p className="mt-2 text-sm text-gray-500 flex items-start gap-1">
-          <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+        <Text size="xs" c="dimmed" mt={4}>
           {field.help_text}
-        </p>
+        </Text>
       )}
-    </div>
+    </Stack>
   )
 }
 
 export default FieldRenderer
-

@@ -67,9 +67,15 @@ class FormBuilderService:
     @staticmethod
     def create_page(db: Session, page_data: PageCreate) -> Page:
         """Create a new page"""
-        # If this is the first page, mark it
+        # Check if there are any existing pages in this form
+        existing_pages = db.query(Page).filter(Page.form_id == page_data.form_id).count()
+        
+        # If this is the first page in the form, it must be marked as first
+        if existing_pages == 0:
+            page_data.is_first = True
+        
+        # If this page is marked as first, unmark all other first pages
         if page_data.is_first:
-            # Unmark other first pages in the form
             db.query(Page).filter(
                 and_(Page.form_id == page_data.form_id, Page.is_first == True)
             ).update({"is_first": False})
@@ -100,10 +106,25 @@ class FormBuilderService:
         update_data = page_data.dict(exclude_unset=True)
         
         # Handle is_first flag
-        if page_data.is_first is not None and page_data.is_first:
-            db.query(Page).filter(
-                and_(Page.form_id == page.form_id, Page.is_first == True, Page.id != page_id)
-            ).update({"is_first": False})
+        if page_data.is_first is not None:
+            if page_data.is_first:
+                # Setting this page as first: unmark all other first pages
+                db.query(Page).filter(
+                    and_(Page.form_id == page.form_id, Page.is_first == True, Page.id != page_id)
+                ).update({"is_first": False})
+            else:
+                # Unsetting is_first: ensure at least one other page is first
+                if page.is_first:
+                    other_pages = db.query(Page).filter(
+                        and_(Page.form_id == page.form_id, Page.id != page_id)
+                    ).all()
+                    if other_pages:
+                        # Make the first other page (by order) the first page
+                        first_other = min(other_pages, key=lambda p: p.order)
+                        first_other.is_first = True
+                    # If no other pages exist, keep this one as first (don't allow unsetting)
+                    else:
+                        update_data.pop('is_first', None)
         
         for field, value in update_data.items():
             setattr(page, field, value)
@@ -119,8 +140,19 @@ class FormBuilderService:
         if not page:
             return False
         
+        form_id = page.form_id
+        was_first = page.is_first
+        
         db.delete(page)
         db.commit()
+        
+        # If the deleted page was the first page, make another page first
+        if was_first:
+            remaining_pages = db.query(Page).filter(Page.form_id == form_id).order_by(Page.order).all()
+            if remaining_pages:
+                remaining_pages[0].is_first = True
+                db.commit()
+        
         return True
 
     # Field operations

@@ -1,54 +1,60 @@
 import { Link, useParams } from 'react-router-dom'
+import { Container, Card, Title, Text, Button, Stack, Group } from '@mantine/core'
+import { IconCheck, IconHome, IconRefresh } from '@tabler/icons-react'
 
 function FormComplete() {
   const { formId } = useParams<{ formId: string }>()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-10 max-w-md w-full text-center border border-white/20">
-        <div className="mb-6">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-            <svg
-              className="h-8 w-8 text-green-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
+    <Container size="sm" py="xl">
+      <Card shadow="md" padding="xl" radius="md" withBorder>
+        <Stack align="center" gap="lg">
+          <div style={{ 
+            width: 80, 
+            height: 80, 
+            borderRadius: '50%', 
+            background: 'var(--mantine-color-green-1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <IconCheck size={48} stroke={2} style={{ color: 'var(--mantine-color-green-6)' }} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Form Completed!
-          </h2>
-          <p className="text-gray-600">
-            Thank you for completing the form. Your responses have been saved.
-          </p>
-        </div>
-        <div className="space-y-3">
-          <Link
-            to="/"
-            className="block w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all mb-3"
-          >
-            Back to Home
-          </Link>
-          {formId && (
-            <Link
-              to={`/form/${formId}`}
-              className="block w-full border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-50 hover:border-gray-400 font-semibold transition-all"
+          <div style={{ textAlign: 'center' }}>
+            <Title order={2} mb="xs">Form Completed!</Title>
+            <Text c="dimmed">
+              Thank you for completing the form. Your responses have been saved.
+            </Text>
+          </div>
+          <Stack gap="sm" style={{ width: '100%' }}>
+            <Button
+              component={Link}
+              to="/"
+              fullWidth
+              size="md"
+              leftSection={<IconHome size={18} />}
+              variant="gradient"
+              gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
             >
-              Fill Again
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
+              Back to Home
+            </Button>
+            {formId && (
+              <Button
+                component={Link}
+                to={`/form/${formId}`}
+                fullWidth
+                size="md"
+                variant="light"
+                leftSection={<IconRefresh size={18} />}
+              >
+                Fill Again
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Card>
+    </Container>
   )
 }
 
 export default FormComplete
-
