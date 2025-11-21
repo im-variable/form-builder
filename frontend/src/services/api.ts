@@ -147,6 +147,11 @@ export const formAPI = {
 // Builder API Functions
 export const builderAPI = {
   // Forms
+  getForm: async (formId: number): Promise<Form> => {
+    const response = await api.get(`/builder/forms/${formId}`)
+    return response.data
+  },
+
   createForm: async (data: { title: string; description?: string; is_active?: boolean }): Promise<Form> => {
     const response = await api.post('/builder/forms', data)
     return response.data

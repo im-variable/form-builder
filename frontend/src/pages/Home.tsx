@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Container, Title, Text, Button, Card, Grid, Stack, Loader, Alert, Group, Badge } from '@mantine/core'
-import { IconFileText, IconPlus, IconCalendar, IconArrowRight, IconAlertCircle } from '@tabler/icons-react'
-import { formAPI, Form } from '../services/api'
+import { Container, Title, Text, Button, Card, Grid, Stack, Loader, Alert, Group, Badge, Modal } from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
+import { IconFileText, IconPlus, IconCalendar, IconArrowRight, IconAlertCircle, IconEdit, IconTrash } from '@tabler/icons-react'
+import { formAPI, builderAPI, Form } from '../services/api'
 
 function Home() {
   const [forms, setForms] = useState<Form[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false)
+  const [formToDelete, setFormToDelete] = useState<Form | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadForms()
@@ -24,6 +28,30 @@ function Home() {
       console.error('Error loading forms:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteClick = (form: Form) => {
+    setFormToDelete(form)
+    openDeleteModal()
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!formToDelete) return
+
+    try {
+      setDeleting(true)
+      setError(null)
+      await builderAPI.deleteForm(formToDelete.id)
+      // Reload forms after deletion
+      await loadForms()
+      closeDeleteModal()
+      setFormToDelete(null)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete form')
+      console.error('Error deleting form:', err)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -94,13 +122,10 @@ function Home() {
               {forms.map((form) => (
                 <Grid.Col key={form.id} span={{ base: 12, sm: 6, md: 4 }}>
                   <Card
-                    component={Link}
-                    to={`/form/${form.id}`}
                     shadow="sm"
                     padding="lg"
                     radius="md"
                     withBorder
-                    style={{ textDecoration: 'none', color: 'inherit' }}
                     className="hover-card"
                   >
                     <Stack gap="md">
@@ -123,12 +148,40 @@ function Home() {
                             {new Date(form.created_at).toLocaleDateString()}
                           </Text>
                         </Group>
+                      </Group>
+                      <Group gap="xs" mt="xs">
                         <Button
+                          component={Link}
+                          to={`/form/${form.id}`}
                           size="xs"
                           variant="light"
                           rightSection={<IconArrowRight size={14} />}
+                          style={{ flex: 1 }}
                         >
                           Start
+                        </Button>
+                        <Button
+                          component={Link}
+                          to={`/builder/${form.id}`}
+                          size="xs"
+                          variant="light"
+                          color="blue"
+                          leftSection={<IconEdit size={14} />}
+                          style={{ flex: 1 }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          color="red"
+                          leftSection={<IconTrash size={14} />}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handleDeleteClick(form)
+                          }}
+                        >
+                          Delete
                         </Button>
                       </Group>
                     </Stack>
@@ -139,6 +192,40 @@ function Home() {
           )}
         </Stack>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        opened={deleteModalOpened}
+        onClose={closeDeleteModal}
+        title="Delete Form"
+        centered
+      >
+        <Stack gap="md">
+          <Text>
+            Are you sure you want to delete <strong>{formToDelete?.title}</strong>?
+          </Text>
+          <Text size="sm" c="dimmed">
+            This action cannot be undone. All pages, fields, and submissions associated with this form will be permanently deleted.
+          </Text>
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="light"
+              onClick={closeDeleteModal}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              onClick={handleDeleteConfirm}
+              loading={deleting}
+              leftSection={<IconTrash size={16} />}
+            >
+              Delete
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Container>
   )
 }

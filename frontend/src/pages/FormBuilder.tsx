@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Container,
   Title,
@@ -18,7 +18,10 @@ import {
   Alert,
   Paper,
   ActionIcon,
+  Loader,
+  Modal,
 } from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
 import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit } from '@tabler/icons-react'
 import { builderAPI, Form, Page, Field } from '../services/api'
 
@@ -41,8 +44,10 @@ const FIELD_TYPES = [
 
 function FormBuilder() {
   const navigate = useNavigate()
+  const { formId } = useParams<{ formId?: string }>()
   const [activeStep, setActiveStep] = useState(0)
   const [currentForm, setCurrentForm] = useState<Form | null>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [pages, setPages] = useState<Page[]>([])
   const [currentPage, setCurrentPage] = useState<Page | null>(null)
   const [fields, setFields] = useState<Field[]>([])
@@ -77,6 +82,58 @@ function FormBuilder() {
 
   // Edit mode state
   const [editingFieldId, setEditingFieldId] = useState<number | null>(null)
+  
+  // Delete modal state
+  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false)
+  const [deletingForm, setDeletingForm] = useState(false)
+
+  // Load form data when editing
+  useEffect(() => {
+    const loadFormForEdit = async () => {
+      if (formId) {
+        try {
+          setLoading(true)
+          setError(null)
+          const form = await builderAPI.getForm(parseInt(formId))
+          if (form) {
+            setCurrentForm(form)
+            setIsEditMode(true)
+            setFormTitle(form.title)
+            setFormDescription(form.description || '')
+            
+            // Load pages for this form
+            const formPages = await builderAPI.getPages(form.id)
+            setPages(formPages)
+            
+            // If pages exist, go to pages step, otherwise start at form step
+            if (formPages.length > 0) {
+              setActiveStep(1)
+            } else {
+              setActiveStep(0)
+            }
+          } else {
+            setError('Form not found')
+            navigate('/builder')
+          }
+        } catch (err: any) {
+          setError(err.response?.data?.detail || 'Failed to load form')
+          console.error('Error loading form:', err)
+        } finally {
+          setLoading(false)
+        }
+      } else {
+        // Reset to create mode when no formId
+        setIsEditMode(false)
+        setCurrentForm(null)
+        setPages([])
+        setFormTitle('')
+        setFormDescription('')
+        setActiveStep(0)
+      }
+    }
+
+    loadFormForEdit()
+  }, [formId, navigate])
 
   const handleCreateForm = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,15 +145,27 @@ function FormBuilder() {
     try {
       setLoading(true)
       setError(null)
-      const form = await builderAPI.createForm({
-        title: formTitle,
-        description: formDescription || undefined,
-        is_active: true,
-      })
-      setCurrentForm(form)
-      setActiveStep(1)
+      
+      if (isEditMode && currentForm) {
+        // Update existing form
+        const form = await builderAPI.updateForm(currentForm.id, {
+          title: formTitle,
+          description: formDescription || undefined,
+        })
+        setCurrentForm(form)
+        setActiveStep(1)
+      } else {
+        // Create new form
+        const form = await builderAPI.createForm({
+          title: formTitle,
+          description: formDescription || undefined,
+          is_active: true,
+        })
+        setCurrentForm(form)
+        setActiveStep(1)
+      }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create form')
+      setError(err.response?.data?.detail || `Failed to ${isEditMode ? 'update' : 'create'} form`)
     } finally {
       setLoading(false)
     }
@@ -324,31 +393,70 @@ function FormBuilder() {
     }
   }
 
+  const handleDeleteForm = async () => {
+    if (!currentForm || !isEditMode) return
+
+    try {
+      setDeletingForm(true)
+      setError(null)
+      await builderAPI.deleteForm(currentForm.id)
+      // Navigate to home after successful deletion
+      navigate('/')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete form')
+      closeDeleteModal()
+    } finally {
+      setDeletingForm(false)
+    }
+  }
+
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
         {/* Header */}
         <div>
-          <Button
-            component={Link}
-            to="/"
-            variant="subtle"
-            leftSection={<IconArrowLeft size={18} />}
-            mb="md"
-          >
-            Back to Home
-          </Button>
-          <Title order={1} size="2.5rem">Form Builder</Title>
-          <Text c="dimmed" size="lg">Create dynamic forms with conditional logic</Text>
+          <Group justify="space-between" mb="md">
+            <Button
+              component={Link}
+              to="/"
+              variant="subtle"
+              leftSection={<IconArrowLeft size={18} />}
+            >
+              Back to Home
+            </Button>
+            {isEditMode && currentForm && (
+              <Button
+                variant="light"
+                color="red"
+                leftSection={<IconTrash size={18} />}
+                onClick={openDeleteModal}
+              >
+                Delete Form
+              </Button>
+            )}
+          </Group>
+          <Title order={1} size="2.5rem">
+            {isEditMode ? 'Edit Form' : 'Form Builder'}
+          </Title>
+          <Text c="dimmed" size="lg">
+            {isEditMode ? `Editing: ${currentForm?.title}` : 'Create dynamic forms with conditional logic'}
+          </Text>
         </div>
 
         {/* Stepper */}
         <Stepper active={activeStep} onStepClick={setActiveStep} breakpoint="sm">
-          <Stepper.Step label="Form" description="Create form" />
+          <Stepper.Step label="Form" description={isEditMode ? "Edit form" : "Create form"} />
           <Stepper.Step label="Pages" description="Add pages" />
           <Stepper.Step label="Fields" description="Add fields" />
           <Stepper.Completed>Completed! Form is ready.</Stepper.Completed>
         </Stepper>
+
+        {loading && formId && !currentForm && (
+          <Stack align="center" py="xl">
+            <Loader size="lg" />
+            <Text c="dimmed">Loading form data...</Text>
+          </Stack>
+        )}
 
         {error && (
           <Alert icon={<IconAlertCircle size={20} />} title="Error" color="red">
@@ -356,10 +464,10 @@ function FormBuilder() {
           </Alert>
         )}
 
-        {/* Step 1: Create Form */}
+        {/* Step 1: Create/Edit Form */}
         {activeStep === 0 && (
           <Card shadow="md" padding="xl" radius="md" withBorder>
-            <Title order={2} mb="lg">Create Form</Title>
+            <Title order={2} mb="lg">{isEditMode ? 'Edit Form' : 'Create Form'}</Title>
             <form onSubmit={handleCreateForm}>
               <Stack gap="md">
                 <TextInput
@@ -386,7 +494,7 @@ function FormBuilder() {
                   variant="gradient"
                   gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
                 >
-                  Create Form
+                  {isEditMode ? 'Update Form' : 'Create Form'}
                 </Button>
               </Stack>
             </form>
@@ -759,6 +867,40 @@ function FormBuilder() {
             </Stack>
           </Card>
         )}
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          opened={deleteModalOpened}
+          onClose={closeDeleteModal}
+          title="Delete Form"
+          centered
+        >
+          <Stack gap="md">
+            <Text>
+              Are you sure you want to delete <strong>{currentForm?.title}</strong>?
+            </Text>
+            <Text size="sm" c="dimmed">
+              This action cannot be undone. All pages, fields, and submissions associated with this form will be permanently deleted.
+            </Text>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={closeDeleteModal}
+                disabled={deletingForm}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleDeleteForm}
+                loading={deletingForm}
+                leftSection={<IconTrash size={16} />}
+              >
+                Delete
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
       </Stack>
     </Container>
   )

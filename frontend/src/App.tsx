@@ -13,6 +13,7 @@ function App() {
         <Route path="/form/:formId" element={<FormView />} />
         <Route path="/form/:formId/complete" element={<FormComplete />} />
         <Route path="/builder" element={<FormBuilder />} />
+        <Route path="/builder/:formId" element={<FormBuilder />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>
