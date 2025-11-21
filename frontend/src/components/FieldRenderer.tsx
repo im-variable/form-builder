@@ -35,7 +35,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             onChange={handleChange}
             placeholder={field.placeholder}
             required={field.is_required}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
           />
         )
 
@@ -49,7 +49,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             placeholder={field.placeholder}
             required={field.is_required}
             rows={4}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
           />
         )
 
@@ -65,7 +65,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             required={field.is_required}
             min={field.validation_rules?.min}
             max={field.validation_rules?.max}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
           />
         )
 
@@ -78,7 +78,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             value={value || ''}
             onChange={handleChange}
             required={field.is_required}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
           />
         )
 
@@ -91,7 +91,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             value={value || ''}
             onChange={handleChange}
             required={field.is_required}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
           />
         )
 
@@ -103,7 +103,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             value={value || ''}
             onChange={handleChange}
             required={field.is_required}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
           >
             <option value="">Select an option...</option>
             {field.options?.choices?.map((choice: any) => (
@@ -116,9 +116,16 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
 
       case 'radio':
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {field.options?.choices?.map((choice: any) => (
-              <label key={choice.value} className="flex items-center">
+              <label 
+                key={choice.value} 
+                className={`flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                  value === choice.value
+                    ? 'bg-indigo-50 border-indigo-500 shadow-md'
+                    : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                }`}
+              >
                 <input
                   type="radio"
                   name={field.name}
@@ -126,9 +133,11 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
                   checked={value === choice.value}
                   onChange={handleChange}
                   required={field.is_required}
-                  className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                  className="mr-3 w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
-                <span className="text-gray-700">{choice.label}</span>
+                <span className={`font-medium ${value === choice.value ? 'text-indigo-900' : 'text-gray-700'}`}>
+                  {choice.label}
+                </span>
               </label>
             ))}
           </div>
@@ -136,53 +145,78 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
 
       case 'checkbox':
         return (
-          <div className="space-y-2">
-            {field.options?.choices?.map((choice: any) => (
-              <label key={choice.value} className="flex items-center">
-                <input
-                  type="checkbox"
-                  value={choice.value}
-                  checked={Array.isArray(value) && value.includes(choice.value)}
-                  onChange={(e) => handleCheckboxChange(choice.value, e.target.checked)}
-                  className="mr-2 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="text-gray-700">{choice.label}</span>
-              </label>
-            ))}
+          <div className="space-y-3">
+            {field.options?.choices?.map((choice: any) => {
+              const isChecked = Array.isArray(value) && value.includes(choice.value)
+              return (
+                <label 
+                  key={choice.value} 
+                  className={`flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    isChecked
+                      ? 'bg-indigo-50 border-indigo-500 shadow-md'
+                      : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    value={choice.value}
+                    checked={isChecked}
+                    onChange={(e) => handleCheckboxChange(choice.value, e.target.checked)}
+                    className="mr-3 w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <span className={`font-medium ${isChecked ? 'text-indigo-900' : 'text-gray-700'}`}>
+                    {choice.label}
+                  </span>
+                </label>
+              )
+            })}
           </div>
         )
 
       case 'boolean':
+        const isChecked = value === true || value === 'true'
         return (
-          <label className="flex items-center">
+          <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all w-fit ${
+            isChecked
+              ? 'bg-indigo-50 border-indigo-500 shadow-md'
+              : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+          }`}>
             <input
               type="checkbox"
-              checked={value === true || value === 'true'}
+              checked={isChecked}
               onChange={(e) => onChange(e.target.checked)}
-              className="mr-2 text-indigo-600 focus:ring-indigo-500"
+              className="mr-3 w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
             />
-            <span className="text-gray-700">Yes</span>
+            <span className={`font-semibold ${isChecked ? 'text-indigo-900' : 'text-gray-700'}`}>
+              {isChecked ? 'Yes' : 'No'}
+            </span>
           </label>
         )
 
       case 'rating':
         const maxRating = field.options?.max || 5
         return (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-3">
             {Array.from({ length: maxRating }, (_, i) => i + 1).map((rating) => (
               <button
                 key={rating}
                 type="button"
                 onClick={() => onChange(rating)}
-                className={`w-10 h-10 rounded-full border-2 ${
+                className={`w-14 h-14 rounded-full border-2 flex items-center justify-center text-2xl transition-all ${
                   value >= rating
-                    ? 'bg-yellow-400 border-yellow-500'
-                    : 'bg-gray-100 border-gray-300'
-                } hover:bg-yellow-300 transition-colors`}
+                    ? 'bg-gradient-to-br from-yellow-400 to-orange-400 border-yellow-500 shadow-lg scale-110'
+                    : 'bg-gray-100 border-gray-300 hover:border-yellow-300 hover:bg-yellow-50'
+                } transform hover:scale-110 cursor-pointer`}
+                title={`Rate ${rating} out of ${maxRating}`}
               >
                 ⭐
               </button>
             ))}
+            {value && (
+              <span className="ml-4 text-lg font-semibold text-gray-700">
+                {value} / {maxRating}
+              </span>
+            )}
           </div>
         )
 
@@ -196,7 +230,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             onChange={handleChange}
             placeholder={field.placeholder}
             required={field.is_required}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
           />
         )
     }
@@ -207,14 +241,23 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
   }
 
   return (
-    <div className="field-group">
-      <label htmlFor={field.name} className="field-label">
+    <div className="field-group bg-gray-50 rounded-xl p-6 border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all">
+      <label htmlFor={field.name} className="block text-sm font-semibold text-gray-900 mb-3">
         {field.label}
-        {field.is_required && <span className="field-required">*</span>}
+        {field.is_required && (
+          <span className="ml-2 text-red-500 font-bold" title="Required field">*</span>
+        )}
       </label>
-      {renderField()}
+      <div className="mb-2">
+        {renderField()}
+      </div>
       {field.help_text && (
-        <p className="field-help">{field.help_text}</p>
+        <p className="mt-2 text-sm text-gray-500 flex items-start gap-1">
+          <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {field.help_text}
+        </p>
       )}
     </div>
   )

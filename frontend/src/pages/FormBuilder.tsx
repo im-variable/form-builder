@@ -228,66 +228,96 @@ function FormBuilder() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-10">
           <Link
             to="/"
-            className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block"
+            className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 mb-6 font-semibold transition-colors"
           >
-            ← Back to Home
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Home
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Form Builder</h1>
-          <p className="text-gray-600 mt-2">Create dynamic forms with conditional logic</p>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-indigo-100 rounded-2xl p-4">
+              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900">Form Builder</h1>
+              <p className="text-gray-600 mt-1 text-lg">Create dynamic forms with conditional logic</p>
+            </div>
+          </div>
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8">
+        <div className="mb-10 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
           <div className="flex items-center justify-between">
-            {['form', 'pages', 'fields', 'complete'].map((s, idx) => (
-              <div key={s} className="flex items-center flex-1">
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                    step === s
-                      ? 'bg-indigo-600 text-white'
-                      : idx < ['form', 'pages', 'fields', 'complete'].indexOf(step)
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {idx + 1}
+            {['form', 'pages', 'fields', 'complete'].map((s, idx) => {
+              const stepIndex = ['form', 'pages', 'fields', 'complete'].indexOf(step)
+              const isActive = step === s
+              const isCompleted = idx < stepIndex
+              
+              return (
+                <div key={s} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center flex-1">
+                    <div
+                      className={`flex items-center justify-center w-12 h-12 rounded-full font-bold text-sm transition-all ${
+                        isActive
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-110'
+                          : isCompleted
+                          ? 'bg-green-500 text-white shadow-md'
+                          : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        idx + 1
+                      )}
+                    </div>
+                    <span className={`mt-2 text-xs font-semibold ${
+                      isActive ? 'text-indigo-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
+                    }`}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </span>
+                  </div>
+                  {idx < 3 && (
+                    <div
+                      className={`flex-1 h-1 mx-2 rounded-full transition-all ${
+                        idx < stepIndex
+                          ? 'bg-green-500'
+                          : 'bg-gray-200'
+                      }`}
+                    />
+                  )}
                 </div>
-                {idx < 3 && (
-                  <div
-                    className={`flex-1 h-1 mx-2 ${
-                      idx < ['form', 'pages', 'fields', 'complete'].indexOf(step)
-                        ? 'bg-green-500'
-                        : 'bg-gray-200'
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between mt-2 text-sm text-gray-600">
-            <span>Form</span>
-            <span>Pages</span>
-            <span>Fields</span>
-            <span>Complete</span>
+              )
+            })}
           </div>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
+          <div className="bg-red-50/90 backdrop-blur-sm border-2 border-red-300 text-red-700 px-6 py-4 rounded-xl mb-6 shadow-lg">
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-medium">{error}</span>
+            </div>
           </div>
         )}
 
         {/* Step 1: Create Form */}
         {step === 'form' && (
-          <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 md:p-10 border border-white/20">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">Create Form</h2>
             <form onSubmit={handleCreateForm}>
               <div className="space-y-4">
@@ -299,7 +329,7 @@ function FormBuilder() {
                     type="text"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                     placeholder="e.g., Customer Feedback Survey"
                     required
                   />
@@ -311,7 +341,7 @@ function FormBuilder() {
                   <textarea
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                     rows={3}
                     placeholder="Brief description of the form"
                   />
@@ -319,7 +349,7 @@ function FormBuilder() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all"
                 >
                   {loading ? 'Creating...' : 'Create Form'}
                 </button>
@@ -330,7 +360,7 @@ function FormBuilder() {
 
         {/* Step 2: Create Pages */}
         {step === 'pages' && currentForm && (
-          <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 md:p-10 border border-white/20">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">
               Add Pages to "{currentForm.title}"
             </h2>
@@ -344,7 +374,7 @@ function FormBuilder() {
                     type="text"
                     value={pageTitle}
                     onChange={(e) => setPageTitle(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                     placeholder="e.g., Basic Information"
                     required
                   />
@@ -356,7 +386,7 @@ function FormBuilder() {
                   <textarea
                     value={pageDescription}
                     onChange={(e) => setPageDescription(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                     rows={2}
                     placeholder="Page description"
                   />
@@ -399,7 +429,7 @@ function FormBuilder() {
                   {pages.map((page) => (
                     <div
                       key={page.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all"
                     >
                       <div>
                         <span className="font-medium">{page.title}</span>
@@ -411,7 +441,7 @@ function FormBuilder() {
                       </div>
                       <button
                         onClick={() => handlePageSelect(page)}
-                        className="text-indigo-600 hover:text-indigo-700 text-sm"
+                        className="text-indigo-600 hover:text-indigo-700 text-sm font-semibold flex items-center gap-1 hover:gap-2 transition-all"
                       >
                         Add Fields →
                       </button>
@@ -425,7 +455,7 @@ function FormBuilder() {
 
         {/* Step 3: Create Fields */}
         {step === 'fields' && currentPage && currentForm && (
-          <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 md:p-10 border border-white/20">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-semibold text-gray-900">
                 Add Fields to "{currentPage.title}"
@@ -458,7 +488,7 @@ function FormBuilder() {
                       type="text"
                       value={fieldName}
                       onChange={(e) => setFieldName(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                       placeholder="e.g., email, age"
                       required
                     />
@@ -471,7 +501,7 @@ function FormBuilder() {
                       type="text"
                       value={fieldLabel}
                       onChange={(e) => setFieldLabel(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                       placeholder="e.g., Email Address"
                       required
                     />
@@ -484,7 +514,7 @@ function FormBuilder() {
                   <select
                     value={fieldType}
                     onChange={(e) => handleFieldTypeChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                   >
                     {FIELD_TYPES.map((type) => (
                       <option key={type.value} value={type.value}>
@@ -501,7 +531,7 @@ function FormBuilder() {
                     type="text"
                     value={fieldPlaceholder}
                     onChange={(e) => setFieldPlaceholder(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                     placeholder="Enter placeholder text"
                   />
                 </div>
@@ -513,7 +543,7 @@ function FormBuilder() {
                     type="text"
                     value={fieldHelpText}
                     onChange={(e) => setFieldHelpText(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
                     placeholder="Additional help text"
                   />
                 </div>
@@ -586,7 +616,7 @@ function FormBuilder() {
                         type="button"
                         onClick={handleAddChoice}
                         disabled={!newChoiceValue.trim() || !newChoiceLabel.trim()}
-                        className="w-full bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                        className="w-full bg-indigo-100 text-indigo-700 px-4 py-3 rounded-xl hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold shadow-md hover:shadow-lg transition-all"
                       >
                         + Add Option
                       </button>
@@ -659,7 +689,7 @@ function FormBuilder() {
                   <button
                     type="button"
                     onClick={() => setStep('pages')}
-                    className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300"
+                    className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 shadow-md hover:shadow-lg transition-all"
                   >
                     Add More Pages
                   </button>
@@ -669,7 +699,7 @@ function FormBuilder() {
                       setStep('complete')
                       setCurrentPage(null)
                     }}
-                    className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700"
+                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all"
                   >
                     Finish
                   </button>
@@ -683,7 +713,7 @@ function FormBuilder() {
                   {fields.map((field) => (
                     <div
                       key={field.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all"
                     >
                       <div>
                         <span className="font-medium">{field.label}</span>
@@ -704,7 +734,7 @@ function FormBuilder() {
 
         {/* Step 4: Complete */}
         {step === 'complete' && currentForm && (
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-12 text-center border border-white/20">
             <div className="mb-6">
               <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
                 <svg
