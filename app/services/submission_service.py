@@ -75,73 +75,15 @@ class SubmissionService:
 
         db.commit()
 
-        # Get all current answers
-        all_responses = db.query(FieldResponse).options(
-            joinedload(FieldResponse.field)
-        ).filter(
-            FieldResponse.submission_id == submission.id
-        ).all()
-
-        answers = {}
-        for resp in all_responses:
-            answers[resp.field.name] = resp.value
-
-        # Get current page
-        current_page = db.query(Page).filter(Page.id == submission.current_page_id).first()
-        if not current_page:
-            # Find first page
-            current_page = db.query(Page).filter(
-                Page.form_id == submission.form_id,
-                Page.is_first == True
-            ).first()
-
-        if not current_page:
-            current_page = db.query(Page).filter(
-                Page.form_id == submission.form_id
-            ).order_by(Page.order).first()
-
-        # Determine next page based on navigation rules
-        next_page_id = None
-        is_complete = False
-
-        if current_page:
-            navigation_rules = current_page.navigation_rules
-            if navigation_rules:
-                next_page_id = ConditionEngine.determine_next_page(
-                    current_page.id,
-                    navigation_rules,
-                    answers,
-                    db
-                )
-                is_complete = next_page_id is None
-            else:
-                # No navigation rules, go to next page by order
-                # Sort pages: first page always first, then others by order
-                all_pages = db.query(Page).filter(Page.form_id == submission.form_id).all()
-                sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
-                current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), -1)
-                
-                if current_page_index >= 0 and current_page_index < len(sorted_pages) - 1:
-                    # There's a next page
-                    next_page_id = sorted_pages[current_page_index + 1].id
-                else:
-                    is_complete = True
-
-            # Update submission current page
-            if next_page_id:
-                submission.current_page_id = next_page_id
-            elif is_complete:
-                submission.status = "completed"
-                from datetime import datetime
-                submission.completed_at = datetime.utcnow()
-            
-            db.commit()
-
+        # Note: We don't determine next page here because multiple fields might be submitted
+        # on the same page. The renderForm service will determine the next page after all
+        # fields on the current page are submitted.
+        
         return SubmitAnswerResponse(
             success=True,
-            next_page_id=next_page_id,
-            is_complete=is_complete,
-            message="Answer submitted successfully" if not is_complete else "Form completed!"
+            next_page_id=None,  # Will be determined by renderForm
+            is_complete=False,  # Will be determined by renderForm
+            message="Answer submitted successfully"
         )
 
     @staticmethod

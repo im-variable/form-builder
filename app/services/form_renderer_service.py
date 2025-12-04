@@ -35,7 +35,8 @@ class FormRendererService:
         db: Session,
         form_id: int,
         session_id: str,
-        current_answers: Optional[Dict[str, Any]] = None
+        current_answers: Optional[Dict[str, Any]] = None,
+        auto_advance: bool = True
     ) -> FormRenderResponse:
         """
         Render the form and determine the current page to show
@@ -159,6 +160,90 @@ class FormRendererService:
                 next_page_id = sorted_pages[current_page_index + 1].id
             # else: next_page_id remains None (last page)
 
+        # If there's a next page and auto_advance is enabled, show the next page immediately
+        if next_page_id and auto_advance:
+            # Update submission to point to next page
+            submission.current_page_id = next_page_id
+            db.commit()
+            
+            # Get the next page and render it
+            next_page = db.query(Page).options(
+                joinedload(Page.navigation_rules).joinedload(PageNavigationRule.source_field)
+            ).filter(Page.id == next_page_id).first()
+            
+            if next_page:
+                # Render fields for the next page
+                next_page_fields = db.query(Field).filter(Field.page_id == next_page.id).order_by(Field.order).all()
+                next_rendered_fields = []
+                
+                for field in next_page_fields:
+                    # Evaluate field conditions
+                    field_conditions = db.query(FieldCondition).filter(FieldCondition.target_field_id == field.id).all()
+                    is_visible = ConditionEngine.should_field_be_visible(field.id, field_conditions, current_answers)
+                    
+                    # Get current value if exists
+                    current_value = current_answers.get(field.name)
+                    
+                    next_rendered_fields.append(RenderedField(
+                        id=field.id,
+                        name=field.name,
+                        label=field.label,
+                        field_type=field.field_type,
+                        placeholder=field.placeholder,
+                        help_text=field.help_text,
+                        is_required=field.is_required,
+                        is_visible=is_visible,
+                        default_value=field.default_value,
+                        options=field.options,
+                        validation_rules=field.validation_rules,
+                        current_value=current_value
+                    ))
+                
+                next_rendered_page = RenderedPage(
+                    id=next_page.id,
+                    title=next_page.title,
+                    description=next_page.description,
+                    order=next_page.order,
+                    fields=next_rendered_fields
+                )
+                
+                # Determine next page for this page
+                next_navigation_rules = next_page.navigation_rules
+                next_next_page_id = None
+                
+                if next_navigation_rules:
+                    next_next_page_id = ConditionEngine.determine_next_page(
+                        next_page.id,
+                        next_navigation_rules,
+                        current_answers,
+                        db
+                    )
+                else:
+                    all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+                    sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+                    next_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == next_page.id), -1)
+                    
+                    if next_page_index >= 0 and next_page_index < len(sorted_pages) - 1:
+                        next_next_page_id = sorted_pages[next_page_index + 1].id
+                
+                # Calculate progress for next page
+                all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+                sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+                total_pages = len(sorted_pages)
+                next_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == next_page.id), 0)
+                progress = ((next_page_index + 1) / total_pages * 100) if total_pages > 0 else 0
+                
+                is_complete = next_next_page_id is None
+                
+                return FormRenderResponse(
+                    form_id=form_id,
+                    form_title=form.title,
+                    current_page=next_rendered_page,
+                    next_page_id=next_next_page_id,
+                    is_complete=is_complete,
+                    progress=round(progress, 2)
+                )
+
         # Calculate progress
         # Sort pages: first page always first, then others by order
         all_pages = db.query(Page).filter(Page.form_id == form_id).all()
@@ -169,6 +254,16 @@ class FormRendererService:
 
         # Form is complete if there's no next page
         is_complete = next_page_id is None
+
+        # Update submission state
+        if next_page_id:
+            submission.current_page_id = next_page_id
+        elif is_complete:
+            submission.status = "completed"
+            from datetime import datetime
+            submission.completed_at = datetime.utcnow()
+        
+        db.commit()
 
         return FormRenderResponse(
             form_id=form_id,
