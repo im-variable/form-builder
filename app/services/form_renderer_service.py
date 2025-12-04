@@ -36,7 +36,7 @@ class FormRendererService:
         form_id: int,
         session_id: str,
         current_answers: Optional[Dict[str, Any]] = None,
-        auto_advance: bool = True
+        auto_advance: bool = False
     ) -> FormRenderResponse:
         """
         Render the form and determine the current page to show
@@ -51,15 +51,23 @@ class FormRendererService:
             Submission.form_id == form_id
         ).first()
 
+        is_new_submission = False
         if not submission:
             # Create new submission
-            submission = Submission(form_id=form_id, session_id=session_id, status="in_progress")
+            is_new_submission = True
+            submission = Submission(form_id=form_id, session_id=session_id, status="in_progress", current_page_id=None)
             db.add(submission)
             db.commit()
             db.refresh(submission)
         else:
             # Refresh submission to get latest current_page_id
             db.refresh(submission)
+            # If submission exists but has no answers, reset to first page
+            existing_answers = FormRendererService.get_current_answers(db, session_id)
+            if not existing_answers or len(existing_answers) == 0:
+                submission.current_page_id = None
+                db.commit()
+                db.refresh(submission)
 
         # Get current answers
         # If current_answers is None or empty, get from database
@@ -69,7 +77,12 @@ class FormRendererService:
 
         # Determine current page
         current_page = None
-        if submission.current_page_id:
+        
+        # Only use submission.current_page_id if:
+        # 1. It's not a new submission AND
+        # 2. There are actual answers (user has progressed)
+        # Otherwise, always start from the first page
+        if not is_new_submission and submission.current_page_id and current_answers and len(current_answers) > 0:
             current_page = db.query(Page).options(
                 joinedload(Page.navigation_rules).joinedload(PageNavigationRule.source_field)
             ).filter(Page.id == submission.current_page_id).first()
@@ -161,7 +174,8 @@ class FormRendererService:
             # else: next_page_id remains None (last page)
 
         # If there's a next page and auto_advance is enabled, show the next page immediately
-        if next_page_id and auto_advance:
+        # Only auto-advance if there are actual answers (not on initial render)
+        if next_page_id and auto_advance and current_answers and len(current_answers) > 0:
             # Update submission to point to next page
             submission.current_page_id = next_page_id
             db.commit()
@@ -256,9 +270,12 @@ class FormRendererService:
         is_complete = next_page_id is None
 
         # Update submission state
-        if next_page_id:
-            submission.current_page_id = next_page_id
-        elif is_complete:
+        # Only update current_page_id to the current page we're showing (not the next page)
+        # The next page will be set when we actually advance
+        if not submission.current_page_id or submission.current_page_id != current_page.id:
+            submission.current_page_id = current_page.id
+        
+        if is_complete:
             submission.status = "completed"
             from datetime import datetime
             submission.completed_at = datetime.utcnow()

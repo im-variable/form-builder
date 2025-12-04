@@ -28,7 +28,7 @@ import {
   Rating,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin } from '@tabler/icons-react'
 import { builderAPI, Form, Page, Field } from '../services/api'
 
 const FIELD_TYPES = [
@@ -311,6 +311,22 @@ function FormBuilder() {
     }
   }
 
+  const handleSetAsFirstPage = async (pageId: number) => {
+    try {
+      setLoading(true)
+      setError(null)
+      await builderAPI.updatePage(pageId, { is_first: true })
+      // Reload pages to get updated is_first status
+      if (currentForm) {
+        await loadPages()
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to set page as first')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Reload pages when navigating to step 1 (pages)
   useEffect(() => {
     if (activeStep === 1 && currentForm) {
@@ -512,9 +528,7 @@ function FormBuilder() {
   }
 
   const handleFinish = () => {
-    if (currentForm) {
-      navigate(`/form/${currentForm.id}`)
-    }
+    navigate('/')
   }
 
   const handleDeleteForm = async () => {
@@ -764,6 +778,21 @@ function FormBuilder() {
                                 </Group>
                               </div>
                               <Group gap={2}>
+                                {!page.is_first && (
+                                  <ActionIcon
+                                    color="indigo"
+                                    variant="light"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleSetAsFirstPage(page.id)
+                                    }}
+                                    disabled={loading}
+                                    size="sm"
+                                    title="Set as First Page"
+                                  >
+                                    <IconPin size={14} />
+                                  </ActionIcon>
+                                )}
                                 <ActionIcon
                                   color="blue"
                                   variant="light"
@@ -796,6 +825,17 @@ function FormBuilder() {
                       </Stack>
                     </ScrollArea>
                   )}
+                  <Divider />
+                  <Button
+                    variant="gradient"
+                    gradient={{ from: 'green', to: 'teal', deg: 90 }}
+                    onClick={handleFinish}
+                    disabled={pages.length === 0}
+                    fullWidth
+                    leftSection={<IconCheck size={18} />}
+                  >
+                    Finish Form
+                  </Button>
                 </Stack>
               </Card>
             </Grid.Col>
