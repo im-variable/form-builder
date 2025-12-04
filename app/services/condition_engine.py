@@ -76,16 +76,39 @@ class ConditionEngine:
         """
         Evaluate all conditions for a field and return action states
         Returns: Dict with action -> bool (e.g., {"show": True, "require": False})
+        
+        Logic:
+        - Fields with "show" conditions: hidden by default, shown only if condition is met
+        - Fields with "hide" conditions: visible by default, hidden if condition is met
+        - Multiple conditions use OR logic (any condition met applies the action)
         """
-        result = {
-            "show": True,
-            "hide": False,
-            "enable": True,
-            "disable": False,
-            "require": False,
-            "skip": False
-        }
+        # Check what types of conditions exist
+        has_show_conditions = any(c.action.value == "show" for c in conditions)
+        has_hide_conditions = any(c.action.value == "hide" for c in conditions)
+        
+        # Set default visibility based on condition types
+        if has_show_conditions and not has_hide_conditions:
+            # Field should be hidden by default, shown only if condition is met
+            result = {
+                "show": False,
+                "hide": True,
+                "enable": True,
+                "disable": False,
+                "require": False,
+                "skip": False
+            }
+        else:
+            # Default: visible (for hide conditions or no visibility conditions)
+            result = {
+                "show": True,
+                "hide": False,
+                "enable": True,
+                "disable": False,
+                "require": False,
+                "skip": False
+            }
 
+        # Evaluate all conditions - if ANY condition is met, apply its action
         for condition in conditions:
             # Get source field value from answers
             source_field_name = condition.source_field.name

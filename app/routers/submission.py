@@ -90,3 +90,12 @@ def delete_submission(submission_id: int, db: Session = Depends(get_db)):
     return {"message": "Submission deleted successfully"}
 
 
+@router.put("/{session_id}/current-page/{page_id}")
+def update_current_page(session_id: str, page_id: int, db: Session = Depends(get_db)):
+    """Update the current page ID for a submission (for navigation)"""
+    success = SubmissionService.update_current_page(db, session_id, page_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return {"message": "Current page updated successfully"}
+
+

@@ -2,7 +2,7 @@
 Form Builder Service
 Handles CRUD operations for forms, pages, fields, and conditions
 """
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 from typing import List, Optional
 from app.models import Form, Page, Field, FieldCondition, PageNavigationRule
@@ -214,7 +214,10 @@ class FormBuilderService:
     @staticmethod
     def get_field_conditions(db: Session, field_id: int) -> List[FieldCondition]:
         """Get all conditions for a field"""
-        return db.query(FieldCondition).filter(
+        from sqlalchemy.orm import joinedload
+        return db.query(FieldCondition).options(
+            joinedload(FieldCondition.source_field)
+        ).filter(
             FieldCondition.target_field_id == field_id
         ).all()
 

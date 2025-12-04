@@ -13,7 +13,7 @@ import {
   Alert,
   Paper,
 } from '@mantine/core'
-import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck } from '@tabler/icons-react'
+import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck, IconArrowLeft } from '@tabler/icons-react'
 import { formAPI, FormRenderResponse, SubmitAnswerRequest } from '../services/api'
 import FieldRenderer from '../components/FieldRenderer'
 
@@ -26,6 +26,7 @@ function FormView() {
   const [error, setError] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [sessionId, setSessionId] = useState<string>('')
+  const [pageHistory, setPageHistory] = useState<number[]>([]) // Track page IDs in order
 
   useEffect(() => {
     if (formId) {
@@ -42,6 +43,7 @@ function FormView() {
       await formAPI.createSubmission(id, newSessionId)
       const data = await formAPI.renderForm(id, newSessionId, {})
       setFormData(data)
+      setPageHistory([data.current_page.id]) // Initialize with first page
 
       const initialAnswers: Record<string, any> = {}
       data.current_page.fields.forEach((field) => {
@@ -64,6 +66,42 @@ function FormView() {
       ...prev,
       [fieldName]: value,
     }))
+  }
+
+  const handleGoBack = async () => {
+    if (!formData || !sessionId || pageHistory.length <= 1) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Get the previous page ID
+      const previousPageId = pageHistory[pageHistory.length - 2]
+
+      // Update the submission's current page
+      await formAPI.updateCurrentPage(sessionId, previousPageId)
+
+      // Render the previous page
+      const updatedForm = await formAPI.renderForm(parseInt(formId!), sessionId)
+      setFormData(updatedForm)
+
+      // Update page history - remove the last page
+      setPageHistory((prev) => prev.slice(0, -1))
+
+      // Initialize answers for the previous page
+      const newAnswers: Record<string, any> = {}
+      updatedForm.current_page.fields.forEach((field) => {
+        if (field.current_value !== undefined && field.current_value !== null) {
+          newAnswers[field.name] = field.current_value
+        }
+      })
+      setAnswers(newAnswers)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to go back')
+      console.error('Error going back:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,6 +138,15 @@ function FormView() {
         // Backend should have advanced to next page if answers exist
         // Always update formData with the response
         setFormData(updatedForm)
+        
+        // Update page history - add new page if it's different
+        setPageHistory((prev) => {
+          const lastPageId = prev[prev.length - 1]
+          if (updatedForm.current_page.id !== lastPageId) {
+            return [...prev, updatedForm.current_page.id]
+          }
+          return prev
+        })
         
         // Initialize answers for the new page
         const newAnswers: Record<string, any> = {}
@@ -197,13 +244,25 @@ function FormView() {
             </Stack>
 
             <Group justify="space-between" mt="xl" pt="md" style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}>
-              <Button
-                variant="default"
-                leftSection={<IconX size={18} />}
-                onClick={() => navigate('/')}
-              >
-                Cancel
-              </Button>
+              <Group>
+                {pageHistory.length > 1 && (
+                  <Button
+                    variant="default"
+                    leftSection={<IconArrowLeft size={18} />}
+                    onClick={handleGoBack}
+                    disabled={loading}
+                  >
+                    Back
+                  </Button>
+                )}
+                <Button
+                  variant="default"
+                  leftSection={<IconX size={18} />}
+                  onClick={() => navigate('/')}
+                >
+                  Cancel
+                </Button>
+              </Group>
               <Button
                 type="submit"
                 loading={submitting}

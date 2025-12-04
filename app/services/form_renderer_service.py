@@ -69,20 +69,21 @@ class FormRendererService:
                 db.commit()
                 db.refresh(submission)
 
-        # Get current answers
-        # Always get from database to ensure we have the latest state after submissions
-        # This is important because answers might have been submitted just before this call
+        # Get current answers from database
         db_answers = FormRendererService.get_current_answers(db, session_id)
         
-        # Filter out None and empty string values to check if we have real answers
-        non_empty_db_answers = {k: v for k, v in db_answers.items() if v is not None and v != ''} if db_answers else {}
-        
-        if non_empty_db_answers and len(non_empty_db_answers) > 0:
-            # Use database answers if they exist (most up-to-date)
+        # Merge answers: prioritize current_answers (from frontend) for real-time condition evaluation
+        # but use db_answers as base to include all previously saved answers from other pages
+        if current_answers and isinstance(current_answers, dict) and len(current_answers) > 0:
+            # Merge: db_answers as base (includes all saved answers), then override with current_answers (current page edits)
+            merged_answers = {**(db_answers if db_answers else {}), **current_answers}
+            current_answers = merged_answers
+        elif db_answers:
+            # Use database answers if no current_answers passed
             current_answers = db_answers
-        elif current_answers is None or (isinstance(current_answers, dict) and len(current_answers) == 0):
-            # Fall back to passed answers if no database answers
-            current_answers = db_answers if db_answers else {}
+        else:
+            # Fallback to empty dict
+            current_answers = current_answers if current_answers else {}
 
         # Determine current page
         current_page = None

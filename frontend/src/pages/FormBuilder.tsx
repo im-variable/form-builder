@@ -28,7 +28,7 @@ import {
   Rating,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter } from '@tabler/icons-react'
 import { builderAPI, Form, Page, Field } from '../services/api'
 
 const FIELD_TYPES = [
@@ -91,6 +91,22 @@ function FormBuilder() {
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false)
   const [deletingForm, setDeletingForm] = useState(false)
   
+  // Delete page modal state
+  const [deletePageModalOpened, { open: openDeletePageModal, close: closeDeletePageModal }] = useDisclosure(false)
+  const [pageToDelete, setPageToDelete] = useState<Page | null>(null)
+  
+  // Delete field modal state
+  const [deleteFieldModalOpened, { open: openDeleteFieldModal, close: closeDeleteFieldModal }] = useDisclosure(false)
+  const [fieldToDelete, setFieldToDelete] = useState<Field | null>(null)
+  
+  // Delete navigation rule modal state
+  const [deleteRuleModalOpened, { open: openDeleteRuleModal, close: closeDeleteRuleModal }] = useDisclosure(false)
+  const [ruleToDelete, setRuleToDelete] = useState<number | null>(null)
+  
+  // Delete field condition modal state
+  const [deleteConditionModalOpened, { open: openDeleteConditionModal, close: closeDeleteConditionModal }] = useDisclosure(false)
+  const [conditionToDelete, setConditionToDelete] = useState<number | null>(null)
+  
   // Preview modal state
   const [previewModalOpened, { open: openPreviewModal, close: closePreviewModal }] = useDisclosure(false)
   
@@ -106,6 +122,17 @@ function FormBuilder() {
   const [ruleValue, setRuleValue] = useState<string>('')
   const [ruleTargetPageId, setRuleTargetPageId] = useState<string>('')
   const [ruleIsDefault, setRuleIsDefault] = useState(false)
+
+  // Field conditions state
+  const [fieldConditionsModalOpened, { open: openFieldConditionsModal, close: closeFieldConditionsModal }] = useDisclosure(false)
+  const [selectedFieldForConditions, setSelectedFieldForConditions] = useState<Field | null>(null)
+  const [fieldConditions, setFieldConditions] = useState<any[]>([])
+  const [conditionSourcePageId, setConditionSourcePageId] = useState<string>('')
+  const [conditionSourceFieldId, setConditionSourceFieldId] = useState<string>('')
+  const [conditionOperator, setConditionOperator] = useState<string>('equals')
+  const [conditionValue, setConditionValue] = useState<string>('')
+  const [conditionAction, setConditionAction] = useState<string>('show')
+  const [sourcePageFields, setSourcePageFields] = useState<Field[]>([])
 
   // Load form data when editing
   useEffect(() => {
@@ -299,24 +326,29 @@ function FormBuilder() {
     }
   }
 
-  const handleDeletePage = async (pageId: number) => {
-    if (!confirm('Are you sure you want to delete this page? All fields in this page will also be deleted.')) {
-      return
-    }
+  const handleDeletePage = (page: Page) => {
+    setPageToDelete(page)
+    openDeletePageModal()
+  }
+
+  const handleDeletePageConfirm = async () => {
+    if (!pageToDelete) return
 
     try {
       setLoading(true)
       setError(null)
-      await builderAPI.deletePage(pageId)
+      await builderAPI.deletePage(pageToDelete.id)
       // Reload pages after deletion
       if (currentForm) {
         await loadPages()
       }
       // If we deleted the current page, clear it
-      if (currentPage && currentPage.id === pageId) {
+      if (currentPage && currentPage.id === pageToDelete.id) {
         setCurrentPage(null)
         setFields([])
       }
+      closeDeletePageModal()
+      setPageToDelete(null)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to delete page')
     } finally {
@@ -389,21 +421,117 @@ function FormBuilder() {
     }
   }
 
-  const handleDeleteNavigationRule = async (ruleId: number) => {
-    if (!confirm('Are you sure you want to delete this navigation rule?')) {
+  const handleDeleteNavigationRule = (ruleId: number) => {
+    setRuleToDelete(ruleId)
+    openDeleteRuleModal()
+  }
+
+  const handleDeleteNavigationRuleConfirm = async () => {
+    if (!ruleToDelete) return
+
+    try {
+      setLoading(true)
+      setError(null)
+      await builderAPI.deleteNavigationRule(ruleToDelete)
+      if (selectedPageForRules) {
+        const rules = await builderAPI.getNavigationRules(selectedPageForRules.id)
+        setNavigationRules(rules)
+      }
+      closeDeleteRuleModal()
+      setRuleToDelete(null)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete navigation rule')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Field conditions handlers
+  const handleOpenFieldConditions = async (field: Field) => {
+    setSelectedFieldForConditions(field)
+    try {
+      setLoading(true)
+      const conditions = await builderAPI.getFieldConditions(field.id)
+      setFieldConditions(conditions)
+      openFieldConditionsModal()
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to load field conditions')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConditionSourcePageChange = async (pageId: string) => {
+    setConditionSourcePageId(pageId)
+    setConditionSourceFieldId('') // Reset field selection
+    if (pageId && currentForm) {
+      try {
+        const pageFields = await builderAPI.getFields(parseInt(pageId))
+        setSourcePageFields(pageFields)
+      } catch (err: any) {
+        console.error('Error loading fields for page:', err)
+        setSourcePageFields([])
+      }
+    } else {
+      setSourcePageFields([])
+    }
+  }
+
+  const handleCreateFieldCondition = async () => {
+    if (!selectedFieldForConditions || !conditionSourceFieldId || !conditionAction) {
+      setError('Please fill in all required fields')
       return
     }
 
     try {
       setLoading(true)
       setError(null)
-      await builderAPI.deleteNavigationRule(ruleId)
-      if (selectedPageForRules) {
-        const rules = await builderAPI.getNavigationRules(selectedPageForRules.id)
-        setNavigationRules(rules)
-      }
+      await builderAPI.createFieldCondition({
+        source_field_id: parseInt(conditionSourceFieldId),
+        target_field_id: selectedFieldForConditions.id,
+        operator: conditionOperator,
+        value: conditionValue || undefined,
+        action: conditionAction,
+      })
+      
+      // Reload conditions
+      const conditions = await builderAPI.getFieldConditions(selectedFieldForConditions.id)
+      setFieldConditions(conditions)
+      
+      // Reset form
+      setConditionSourcePageId('')
+      setConditionSourceFieldId('')
+      setConditionOperator('equals')
+      setConditionValue('')
+      setConditionAction('show')
+      setSourcePageFields([])
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete navigation rule')
+      setError(err.response?.data?.detail || 'Failed to create field condition')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteFieldCondition = (conditionId: number) => {
+    setConditionToDelete(conditionId)
+    openDeleteConditionModal()
+  }
+
+  const handleDeleteFieldConditionConfirm = async () => {
+    if (!conditionToDelete) return
+
+    try {
+      setLoading(true)
+      setError(null)
+      await builderAPI.deleteFieldCondition(conditionToDelete)
+      if (selectedFieldForConditions) {
+        const conditions = await builderAPI.getFieldConditions(selectedFieldForConditions.id)
+        setFieldConditions(conditions)
+      }
+      closeDeleteConditionModal()
+      setConditionToDelete(null)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete field condition')
     } finally {
       setLoading(false)
     }
@@ -485,19 +613,24 @@ function FormBuilder() {
     setRatingMax(5)
   }
 
-  const handleDeleteField = async (fieldId: number) => {
-    if (!confirm('Are you sure you want to delete this field?')) {
-      return
-    }
+  const handleDeleteField = (field: Field) => {
+    setFieldToDelete(field)
+    openDeleteFieldModal()
+  }
+
+  const handleDeleteFieldConfirm = async () => {
+    if (!fieldToDelete) return
 
     try {
       setLoading(true)
       setError(null)
-      await builderAPI.deleteField(fieldId)
-      setFields(fields.filter(f => f.id !== fieldId))
-      if (editingFieldId === fieldId) {
+      await builderAPI.deleteField(fieldToDelete.id)
+      setFields(fields.filter(f => f.id !== fieldToDelete.id))
+      if (editingFieldId === fieldToDelete.id) {
         handleCancelEdit()
       }
+      closeDeleteFieldModal()
+      setFieldToDelete(null)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to delete field')
     } finally {
@@ -738,21 +871,7 @@ function FormBuilder() {
             <Grid.Col span={{ base: 12, md: 4 }}>
               <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
                 <Stack gap="md">
-                  <Group justify="space-between" align="center">
-                    <Title order={4}>Pages ({pages.length})</Title>
-                    {currentForm && (
-                      <Button
-                        size="sm"
-                        variant="light"
-                        color="green"
-                        leftSection={<IconCheck size={16} />}
-                        onClick={handleFinish}
-                        disabled={pages.length === 0}
-                      >
-                        Finish
-                      </Button>
-                    )}
-                  </Group>
+                  <Title order={4}>Pages ({pages.length})</Title>
                   <Divider />
                   {pages.length === 0 ? (
                     <Text size="sm" c="dimmed" ta="center" py="xl">
@@ -780,7 +899,9 @@ function FormBuilder() {
                             }}
                           >
                             <Group gap="xs" wrap="nowrap">
-                              {!page.is_first && (
+                              {page.is_first ? (
+                                <IconPlayerPlay size={16} style={{ color: 'var(--mantine-color-gray-6)', fill: 'var(--mantine-color-gray-6)' }} />
+                              ) : (
                                 <Stack gap={2}>
                                   <ActionIcon
                                     color="gray"
@@ -804,9 +925,6 @@ function FormBuilder() {
                                   </ActionIcon>
                                 </Stack>
                               )}
-                              {page.is_first && (
-                                <div style={{ width: 24 }} />
-                              )}
                               <div 
                                 style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
                                 onClick={() => handlePageSelect(page)}
@@ -815,11 +933,6 @@ function FormBuilder() {
                                 {page.description && (
                                   <Text size="xs" c="dimmed" truncate mt={2}>{page.description}</Text>
                                 )}
-                                <Group gap={4} mt={4}>
-                                  {page.is_first && (
-                                    <Badge color="indigo" variant="light" size="xs">First (Fixed)</Badge>
-                                  )}
-                                </Group>
                               </div>
                               <Group gap={2}>
                                 {!page.is_first && (
@@ -867,7 +980,7 @@ function FormBuilder() {
                                   variant="light"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleDeletePage(page.id)
+                                    handleDeletePage(page)
                                   }}
                                   disabled={loading}
                                   size="sm"
@@ -882,21 +995,26 @@ function FormBuilder() {
                       </Stack>
                     </ScrollArea>
                   )}
+                  {currentForm && pages.length > 0 && (
+                    <>
+                      <Divider mt="md" />
+                      <Button
+                        fullWidth
+                        size="sm"
+                        variant="gradient"
+                        gradient={{ from: 'green', to: 'teal', deg: 90 }}
+                        leftSection={<IconCheck size={16} />}
+                        onClick={handleFinish}
+                      >
+                        Finish Form
+                      </Button>
+                    </>
+                  )}
                 </Stack>
               </Card>
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 8 }}>
               <Card shadow="sm" padding="md" radius="md" withBorder>
-                <Group mb="md">
-                  <Button
-                    variant="light"
-                    size="sm"
-                    onClick={() => setActiveStep(0)}
-                    leftSection={<IconArrowLeft size={16} />}
-                  >
-                    Back to Form
-                  </Button>
-                </Group>
                 <Title order={4} mb="md">Add Pages to "{currentForm.title}"</Title>
                 <form onSubmit={handleCreatePage}>
                   <Stack gap="sm">
@@ -999,21 +1117,7 @@ function FormBuilder() {
                 <Grid.Col span={{ base: 12, md: 4 }}>
                   <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
                     <Stack gap="md">
-                      <Group justify="space-between" align="center">
-                        <Title order={4}>Fields ({fields.length})</Title>
-                        {currentForm && (
-                          <Button
-                            size="sm"
-                            variant="light"
-                            color="green"
-                            leftSection={<IconCheck size={16} />}
-                            onClick={handleFinish}
-                            disabled={pages.length === 0}
-                          >
-                            Finish
-                          </Button>
-                        )}
-                      </Group>
+                      <Title order={4}>Fields ({fields.length})</Title>
                       <Divider />
                       {fields.length === 0 ? (
                         <Text size="sm" c="dimmed" ta="center" py="xl">
@@ -1081,6 +1185,19 @@ function FormBuilder() {
                                   </div>
                                   <Group gap={2}>
                                     <ActionIcon
+                                      color="orange"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleOpenFieldConditions(field)
+                                      }}
+                                      disabled={loading}
+                                      size="sm"
+                                      title="Configure Field Conditions"
+                                    >
+                                      <IconFilter size={14} />
+                                    </ActionIcon>
+                                    <ActionIcon
                                       color="blue"
                                       variant="light"
                                       onClick={(e) => {
@@ -1097,7 +1214,7 @@ function FormBuilder() {
                                       variant="light"
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        handleDeleteField(field.id)
+                                        handleDeleteField(field)
                                       }}
                                       disabled={loading}
                                       size="sm"
@@ -1110,6 +1227,21 @@ function FormBuilder() {
                             ))}
                           </Stack>
                         </ScrollArea>
+                      )}
+                      {currentForm && pages.length > 0 && (
+                        <>
+                          <Divider mt="md" />
+                          <Button
+                            fullWidth
+                            size="sm"
+                            variant="gradient"
+                            gradient={{ from: 'green', to: 'teal', deg: 90 }}
+                            leftSection={<IconCheck size={16} />}
+                            onClick={handleFinish}
+                          >
+                            Finish Form
+                          </Button>
+                        </>
                       )}
                     </Stack>
                   </Card>
@@ -1659,6 +1791,330 @@ function FormBuilder() {
               </Stack>
             </Stack>
           )}
+        </Modal>
+
+        {/* Field Conditions Modal */}
+        <Modal
+          opened={fieldConditionsModalOpened}
+          onClose={() => {
+            closeFieldConditionsModal()
+            setSelectedFieldForConditions(null)
+            setFieldConditions([])
+            setConditionSourcePageId('')
+            setConditionSourceFieldId('')
+            setConditionOperator('equals')
+            setConditionValue('')
+            setConditionAction('show')
+            setSourcePageFields([])
+          }}
+          title={`Field Conditions: ${selectedFieldForConditions?.label || ''}`}
+          size="xl"
+          centered
+        >
+          {selectedFieldForConditions && (
+            <Stack gap="md">
+              <Text size="sm" c="dimmed">
+                Configure conditions for this field. The field will be shown, hidden, enabled, disabled, required, or skipped based on the value of another field.
+              </Text>
+              <Divider />
+              
+              {/* Existing Conditions */}
+              {fieldConditions.length > 0 && (
+                <Stack gap="sm">
+                  <Title order={4}>Existing Conditions</Title>
+                  {fieldConditions.map((condition) => (
+                    <Paper key={condition.id} p="sm" withBorder>
+                      <Group justify="space-between">
+                        <div style={{ flex: 1 }}>
+                          <Text size="sm">
+                            <strong>{condition.source_field?.label || 'Unknown Field'}</strong>{' '}
+                            {condition.operator === 'equals' && 'equals'}
+                            {condition.operator === 'not_equals' && 'does not equal'}
+                            {condition.operator === 'contains' && 'contains'}
+                            {condition.operator === 'not_contains' && 'does not contain'}
+                            {condition.operator === 'greater_than' && 'is greater than'}
+                            {condition.operator === 'less_than' && 'is less than'}
+                            {condition.operator === 'is_empty' && 'is empty'}
+                            {condition.operator === 'is_not_empty' && 'is not empty'}
+                            {' '}
+                            {condition.value && `"${condition.value}"`}
+                            {' → '}
+                            <strong>
+                              {condition.action === 'show' && 'Show'}
+                              {condition.action === 'hide' && 'Hide'}
+                              {condition.action === 'enable' && 'Enable'}
+                              {condition.action === 'disable' && 'Disable'}
+                              {condition.action === 'require' && 'Require'}
+                              {condition.action === 'skip' && 'Skip'}
+                            </strong>
+                            {' this field'}
+                          </Text>
+                        </div>
+                        <ActionIcon
+                          color="red"
+                          variant="light"
+                          onClick={() => handleDeleteFieldCondition(condition.id)}
+                          disabled={loading}
+                          size="sm"
+                        >
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Group>
+                    </Paper>
+                  ))}
+                  <Divider />
+                </Stack>
+              )}
+
+              {/* Add New Condition */}
+              <Title order={4}>Add New Condition</Title>
+              <Stack gap="sm">
+                <Select
+                  label="Source Page"
+                  description="Select the page containing the field to watch"
+                  placeholder="Select page"
+                  value={conditionSourcePageId}
+                  onChange={handleConditionSourcePageChange}
+                  data={pages.map(p => ({ value: p.id.toString(), label: p.title }))}
+                  required
+                  size="sm"
+                />
+
+                {conditionSourcePageId && sourcePageFields.length > 0 && (
+                  <Select
+                    label="Source Field"
+                    description="Field whose value will trigger this condition"
+                    placeholder="Select field"
+                    value={conditionSourceFieldId}
+                    onChange={(val) => setConditionSourceFieldId(val || '')}
+                    data={sourcePageFields
+                      .filter(f => f.id !== selectedFieldForConditions?.id) // Don't allow self-reference
+                      .map(f => ({ value: f.id.toString(), label: f.label }))}
+                    required
+                    size="sm"
+                  />
+                )}
+
+                {conditionSourcePageId && sourcePageFields.length === 0 && (
+                  <Alert icon={<IconAlertCircle size={16} />} color="yellow" size="sm">
+                    No fields available on this page. Please add fields to the selected page first.
+                  </Alert>
+                )}
+
+                {conditionSourcePageId && (
+                  <Select
+                    label="Operator"
+                    value={conditionOperator}
+                    onChange={(val) => setConditionOperator(val || 'equals')}
+                    data={[
+                      { value: 'equals', label: 'Equals' },
+                      { value: 'not_equals', label: 'Not Equals' },
+                      { value: 'contains', label: 'Contains' },
+                      { value: 'not_contains', label: 'Not Contains' },
+                      { value: 'greater_than', label: 'Greater Than' },
+                      { value: 'less_than', label: 'Less Than' },
+                      { value: 'is_empty', label: 'Is Empty' },
+                      { value: 'is_not_empty', label: 'Is Not Empty' },
+                    ]}
+                    required
+                    size="sm"
+                  />
+                )}
+
+                {conditionSourcePageId && conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty' && (
+                  <TextInput
+                    label="Value"
+                    placeholder="Enter value to compare"
+                    value={conditionValue}
+                    onChange={(e) => setConditionValue(e.currentTarget.value)}
+                    required={conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty'}
+                    size="sm"
+                  />
+                )}
+
+                {conditionSourcePageId && (
+                  <Select
+                    label="Action"
+                    description="What to do when condition is met"
+                    value={conditionAction}
+                    onChange={(val) => setConditionAction(val || 'show')}
+                    data={[
+                      { value: 'show', label: 'Show Field' },
+                      { value: 'hide', label: 'Hide Field' },
+                      { value: 'enable', label: 'Enable Field' },
+                      { value: 'disable', label: 'Disable Field' },
+                      { value: 'require', label: 'Require Field' },
+                      { value: 'skip', label: 'Skip Field' },
+                    ]}
+                    required
+                    size="sm"
+                  />
+                )}
+
+                <Button
+                  onClick={handleCreateFieldCondition}
+                  disabled={!conditionSourcePageId || !conditionSourceFieldId || !conditionAction || loading}
+                  leftSection={<IconPlus size={16} />}
+                  variant="gradient"
+                  gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                  size="sm"
+                >
+                  Add Condition
+                </Button>
+              </Stack>
+            </Stack>
+          )}
+        </Modal>
+
+        {/* Delete Page Modal */}
+        <Modal
+          opened={deletePageModalOpened}
+          onClose={closeDeletePageModal}
+          title="Delete Page"
+          centered
+        >
+          <Stack gap="md">
+            <Text>
+              Are you sure you want to delete this page?
+            </Text>
+            {pageToDelete && (
+              <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                <Text size="sm" fw={500} mb="xs">Page Details:</Text>
+                <Text size="sm">{pageToDelete.title}</Text>
+              </Paper>
+            )}
+            <Alert icon={<IconAlertCircle size={16} />} color="red" size="sm">
+              <Text size="sm" fw={500} mb={4}>Warning:</Text>
+              <Text size="sm">All fields in this page will also be deleted. This action cannot be undone.</Text>
+            </Alert>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={closeDeletePageModal}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleDeletePageConfirm}
+                loading={loading}
+                leftSection={<IconTrash size={16} />}
+              >
+                Delete Page
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        {/* Delete Field Modal */}
+        <Modal
+          opened={deleteFieldModalOpened}
+          onClose={closeDeleteFieldModal}
+          title="Delete Field"
+          centered
+        >
+          <Stack gap="md">
+            <Text>
+              Are you sure you want to delete this field?
+            </Text>
+            {fieldToDelete && (
+              <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                <Text size="sm" fw={500} mb="xs">Field Details:</Text>
+                <Text size="sm"><strong>Label:</strong> {fieldToDelete.label}</Text>
+                <Text size="sm"><strong>Name:</strong> {fieldToDelete.name}</Text>
+                <Text size="sm"><strong>Type:</strong> {fieldToDelete.field_type}</Text>
+              </Paper>
+            )}
+            <Text size="sm" c="dimmed">
+              This action cannot be undone.
+            </Text>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={closeDeleteFieldModal}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleDeleteFieldConfirm}
+                loading={loading}
+                leftSection={<IconTrash size={16} />}
+              >
+                Delete Field
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        {/* Delete Navigation Rule Modal */}
+        <Modal
+          opened={deleteRuleModalOpened}
+          onClose={closeDeleteRuleModal}
+          title="Delete Navigation Rule"
+          centered
+        >
+          <Stack gap="md">
+            <Text>
+              Are you sure you want to delete this navigation rule?
+            </Text>
+            <Text size="sm" c="dimmed">
+              This action cannot be undone.
+            </Text>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={closeDeleteRuleModal}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleDeleteNavigationRuleConfirm}
+                loading={loading}
+                leftSection={<IconTrash size={16} />}
+              >
+                Delete Rule
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
+        {/* Delete Field Condition Modal */}
+        <Modal
+          opened={deleteConditionModalOpened}
+          onClose={closeDeleteConditionModal}
+          title="Delete Field Condition"
+          centered
+        >
+          <Stack gap="md">
+            <Text>
+              Are you sure you want to delete this field condition?
+            </Text>
+            <Text size="sm" c="dimmed">
+              This action cannot be undone.
+            </Text>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={closeDeleteConditionModal}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleDeleteFieldConditionConfirm}
+                loading={loading}
+                leftSection={<IconTrash size={16} />}
+              >
+                Delete Condition
+              </Button>
+            </Group>
+          </Stack>
         </Modal>
       </Stack>
     </Container>
