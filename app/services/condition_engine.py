@@ -135,7 +135,11 @@ class ConditionEngine:
 
         for rule in sorted_rules:
             # Default rule - use it if no other rule matches
+            # But check non-default rules first
             if rule.is_default:
+                # Only return default if we've checked all non-default rules
+                # Since sorted_rules has non-default first, if we reach a default rule,
+                # it means no non-default rules matched
                 return rule.target_page_id
 
             # Evaluate condition-based rule

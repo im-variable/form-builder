@@ -73,7 +73,11 @@ class FormRendererService:
         # Always get from database to ensure we have the latest state after submissions
         # This is important because answers might have been submitted just before this call
         db_answers = FormRendererService.get_current_answers(db, session_id)
-        if db_answers and len(db_answers) > 0:
+        
+        # Filter out None and empty string values to check if we have real answers
+        non_empty_db_answers = {k: v for k, v in db_answers.items() if v is not None and v != ''} if db_answers else {}
+        
+        if non_empty_db_answers and len(non_empty_db_answers) > 0:
             # Use database answers if they exist (most up-to-date)
             current_answers = db_answers
         elif current_answers is None or (isinstance(current_answers, dict) and len(current_answers) == 0):
@@ -167,10 +171,13 @@ class FormRendererService:
                 db
             )
             
-            # If no rule matched and we have no answers yet (initial render),
-            # fall back to sequential navigation
-            if next_page_id is None and (not current_answers or len(current_answers) == 0):
-                # Fall back to sequential navigation for initial render
+            # If no rule matched, fall back to sequential navigation
+            # This handles cases where:
+            # 1. No answers yet (initial render)
+            # 2. Navigation rules don't match current answers
+            # 3. No default rule is set
+            if next_page_id is None:
+                # Fall back to sequential navigation
                 all_pages = db.query(Page).filter(Page.form_id == form_id).all()
                 sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
                 current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), -1)
@@ -283,12 +290,23 @@ class FormRendererService:
         current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), 0)
         progress = ((current_page_index + 1) / total_pages * 100) if total_pages > 0 else 0
 
-        # Form is complete if there's no next page
-        is_complete = next_page_id is None
+        # Form is complete only if:
+        # 1. There's no next page (last page)
+        # 2. AND the user has submitted answers for the current page's fields
+        # Check if current page has any answers
+        current_page_field_names = [f.name for f in fields]
+        current_page_has_answers = any(
+            current_answers.get(field_name) is not None and current_answers.get(field_name) != ''
+            for field_name in current_page_field_names
+        )
+        is_complete = next_page_id is None and current_page_has_answers
 
         # If we have answers and a next page, advance to the next page
         # This happens when user submits a page and we need to show the next one
-        if current_answers and len(current_answers) > 0 and next_page_id:
+        # Check for non-empty answers (filter out None and empty strings)
+        non_empty_answers = {k: v for k, v in current_answers.items() if v is not None and v != ''} if current_answers else {}
+        
+        if non_empty_answers and len(non_empty_answers) > 0 and next_page_id:
             # User has submitted answers, advance to next page
             submission.current_page_id = next_page_id
             db.commit()
@@ -366,7 +384,16 @@ class FormRendererService:
                 next_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == next_page.id), 0)
                 next_progress = ((next_page_index + 1) / total_pages * 100) if total_pages > 0 else 0
                 
-                next_is_complete = next_next_page_id is None
+                # Form is complete only if:
+                # 1. There's no next page (last page)
+                # 2. AND the user has submitted answers for the current page's fields
+                # Check if current page has any answers
+                next_page_field_names = [f.name for f in next_page_fields]
+                next_page_has_answers = any(
+                    current_answers.get(field_name) is not None and current_answers.get(field_name) != ''
+                    for field_name in next_page_field_names
+                )
+                next_is_complete = next_next_page_id is None and next_page_has_answers
                 
                 return FormRenderResponse(
                     form_id=form_id,

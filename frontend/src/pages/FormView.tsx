@@ -96,11 +96,19 @@ function FormView() {
         await formAPI.completeSubmission(sessionId)
         // Navigate to home page to view all forms
         navigate('/')
-      } else if (updatedForm.next_page_id) {
-        setFormData(updatedForm)
-        setAnswers({})
       } else {
+        // Backend should have advanced to next page if answers exist
+        // Always update formData with the response
         setFormData(updatedForm)
+        
+        // Initialize answers for the new page
+        const newAnswers: Record<string, any> = {}
+        updatedForm.current_page.fields.forEach((field) => {
+          if (field.current_value !== undefined && field.current_value !== null) {
+            newAnswers[field.name] = field.current_value
+          }
+        })
+        setAnswers(newAnswers)
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to submit answer')
@@ -152,7 +160,7 @@ function FormView() {
       </Paper>
 
       {/* Form Card */}
-      <Card shadow="md" padding="xl" radius="md" withBorder>
+      <Card key={`page-${formData.current_page.id}`} shadow="md" padding="xl" radius="md" withBorder>
         <Stack gap="xl">
           <Group gap="md" align="flex-start">
             <IconFileText size={32} stroke={1.5} style={{ color: 'var(--mantine-color-indigo-6)' }} />
@@ -174,7 +182,7 @@ function FormView() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form key={formData.current_page.id} onSubmit={handleSubmit}>
             <Stack gap="lg">
               {formData.current_page.fields
                 .filter((field) => field.is_visible)

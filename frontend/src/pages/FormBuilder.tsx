@@ -933,17 +933,6 @@ function FormBuilder() {
                       </Stack>
                     </ScrollArea>
                   )}
-                  <Divider />
-                  <Button
-                    variant="gradient"
-                    gradient={{ from: 'green', to: 'teal', deg: 90 }}
-                    onClick={handleFinish}
-                    disabled={pages.length === 0}
-                    fullWidth
-                    leftSection={<IconCheck size={18} />}
-                  >
-                    Finish Form
-                  </Button>
                 </Stack>
               </Card>
             </Grid.Col>
