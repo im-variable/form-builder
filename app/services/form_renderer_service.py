@@ -70,10 +70,15 @@ class FormRendererService:
                 db.refresh(submission)
 
         # Get current answers
-        # If current_answers is None or empty, get from database
-        # This ensures we have the latest state after submissions
-        if current_answers is None or (isinstance(current_answers, dict) and len(current_answers) == 0):
-            current_answers = FormRendererService.get_current_answers(db, session_id)
+        # Always get from database to ensure we have the latest state after submissions
+        # This is important because answers might have been submitted just before this call
+        db_answers = FormRendererService.get_current_answers(db, session_id)
+        if db_answers and len(db_answers) > 0:
+            # Use database answers if they exist (most up-to-date)
+            current_answers = db_answers
+        elif current_answers is None or (isinstance(current_answers, dict) and len(current_answers) == 0):
+            # Fall back to passed answers if no database answers
+            current_answers = db_answers if db_answers else {}
 
         # Determine current page
         current_page = None
@@ -161,6 +166,18 @@ class FormRendererService:
                 current_answers,
                 db
             )
+            
+            # If no rule matched and we have no answers yet (initial render),
+            # fall back to sequential navigation
+            if next_page_id is None and (not current_answers or len(current_answers) == 0):
+                # Fall back to sequential navigation for initial render
+                all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+                sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+                current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), -1)
+                
+                if current_page_index >= 0 and current_page_index < len(sorted_pages) - 1:
+                    # There's a next page
+                    next_page_id = sorted_pages[current_page_index + 1].id
         else:
             # No navigation rules, go to next page by order
             # Sort pages: first page always first, then others by order
@@ -269,9 +286,98 @@ class FormRendererService:
         # Form is complete if there's no next page
         is_complete = next_page_id is None
 
-        # Update submission state
-        # Only update current_page_id to the current page we're showing (not the next page)
-        # The next page will be set when we actually advance
+        # If we have answers and a next page, advance to the next page
+        # This happens when user submits a page and we need to show the next one
+        if current_answers and len(current_answers) > 0 and next_page_id:
+            # User has submitted answers, advance to next page
+            submission.current_page_id = next_page_id
+            db.commit()
+            
+            # Render the next page instead of current page
+            next_page = db.query(Page).options(
+                joinedload(Page.navigation_rules).joinedload(PageNavigationRule.source_field)
+            ).filter(Page.id == next_page_id).first()
+            
+            if next_page:
+                # Render fields for the next page
+                next_page_fields = db.query(Field).options(
+                    joinedload(Field.conditions).joinedload(FieldCondition.source_field)
+                ).filter(Field.page_id == next_page.id).order_by(Field.order).all()
+                
+                next_rendered_fields = []
+                for field in next_page_fields:
+                    # Check if field should be visible
+                    conditions = field.conditions
+                    is_visible = ConditionEngine.should_field_be_visible(
+                        field.id,
+                        conditions,
+                        current_answers
+                    )
+
+                    # Get current value if exists
+                    current_value = current_answers.get(field.name)
+
+                    next_rendered_fields.append(RenderedField(
+                        id=field.id,
+                        name=field.name,
+                        label=field.label,
+                        field_type=field.field_type,
+                        placeholder=field.placeholder,
+                        help_text=field.help_text,
+                        is_required=field.is_required,
+                        is_visible=is_visible,
+                        default_value=field.default_value,
+                        options=field.options,
+                        validation_rules=field.validation_rules,
+                        current_value=current_value
+                    ))
+                
+                next_rendered_page = RenderedPage(
+                    id=next_page.id,
+                    title=next_page.title,
+                    description=next_page.description,
+                    order=next_page.order,
+                    fields=next_rendered_fields
+                )
+                
+                # Determine next page for this page
+                next_navigation_rules = next_page.navigation_rules
+                next_next_page_id = None
+                
+                if next_navigation_rules:
+                    next_next_page_id = ConditionEngine.determine_next_page(
+                        next_page.id,
+                        next_navigation_rules,
+                        current_answers,
+                        db
+                    )
+                else:
+                    all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+                    sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+                    next_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == next_page.id), -1)
+                    
+                    if next_page_index >= 0 and next_page_index < len(sorted_pages) - 1:
+                        next_next_page_id = sorted_pages[next_page_index + 1].id
+                
+                # Calculate progress for next page
+                all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+                sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+                total_pages = len(sorted_pages)
+                next_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == next_page.id), 0)
+                next_progress = ((next_page_index + 1) / total_pages * 100) if total_pages > 0 else 0
+                
+                next_is_complete = next_next_page_id is None
+                
+                return FormRenderResponse(
+                    form_id=form_id,
+                    form_title=form.title,
+                    current_page=next_rendered_page,
+                    next_page_id=next_next_page_id,
+                    is_complete=next_is_complete,
+                    progress=round(next_progress, 2)
+                )
+
+        # Update submission state for current page (initial render or no next page)
         if not submission.current_page_id or submission.current_page_id != current_page.id:
             submission.current_page_id = current_page.id
         

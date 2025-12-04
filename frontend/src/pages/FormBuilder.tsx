@@ -28,7 +28,7 @@ import {
   Rating,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute } from '@tabler/icons-react'
 import { builderAPI, Form, Page, Field } from '../services/api'
 
 const FIELD_TYPES = [
@@ -93,6 +93,19 @@ function FormBuilder() {
   
   // Preview modal state
   const [previewModalOpened, { open: openPreviewModal, close: closePreviewModal }] = useDisclosure(false)
+  
+  // Navigation rules state
+  const [navigationRulesModalOpened, { open: openNavigationRulesModal, close: closeNavigationRulesModal }] = useDisclosure(false)
+  const [selectedPageForRules, setSelectedPageForRules] = useState<Page | null>(null)
+  const [navigationRules, setNavigationRules] = useState<any[]>([])
+  const [editingRuleId, setEditingRuleId] = useState<number | null>(null)
+  
+  // Navigation rule form state
+  const [ruleSourceFieldId, setRuleSourceFieldId] = useState<string>('')
+  const [ruleOperator, setRuleOperator] = useState<string>('equals')
+  const [ruleValue, setRuleValue] = useState<string>('')
+  const [ruleTargetPageId, setRuleTargetPageId] = useState<string>('')
+  const [ruleIsDefault, setRuleIsDefault] = useState(false)
 
   // Load form data when editing
   useEffect(() => {
@@ -322,6 +335,75 @@ function FormBuilder() {
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to set page as first')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOpenNavigationRules = async (page: Page) => {
+    setSelectedPageForRules(page)
+    try {
+      setLoading(true)
+      // Load fields for this page
+      const pageFields = await builderAPI.getFields(page.id)
+      setFields(pageFields)
+      // Load navigation rules
+      const rules = await builderAPI.getNavigationRules(page.id)
+      setNavigationRules(rules)
+      openNavigationRulesModal()
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to load navigation rules')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateNavigationRule = async () => {
+    if (!selectedPageForRules) return
+
+    try {
+      setLoading(true)
+      setError(null)
+      await builderAPI.createNavigationRule({
+        page_id: selectedPageForRules.id,
+        source_field_id: ruleSourceFieldId ? parseInt(ruleSourceFieldId) : undefined,
+        operator: ruleOperator,
+        value: ruleValue || undefined,
+        target_page_id: ruleTargetPageId ? parseInt(ruleTargetPageId) : undefined,
+        is_default: ruleIsDefault,
+      })
+      // Reload rules
+      const rules = await builderAPI.getNavigationRules(selectedPageForRules.id)
+      setNavigationRules(rules)
+      // Reset form
+      setRuleSourceFieldId('')
+      setRuleOperator('equals')
+      setRuleValue('')
+      setRuleTargetPageId('')
+      setRuleIsDefault(false)
+      setEditingRuleId(null)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to create navigation rule')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteNavigationRule = async (ruleId: number) => {
+    if (!confirm('Are you sure you want to delete this navigation rule?')) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+      await builderAPI.deleteNavigationRule(ruleId)
+      if (selectedPageForRules) {
+        const rules = await builderAPI.getNavigationRules(selectedPageForRules.id)
+        setNavigationRules(rules)
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete navigation rule')
     } finally {
       setLoading(false)
     }
@@ -562,15 +644,28 @@ function FormBuilder() {
             >
               Back to Home
             </Button>
-            {isEditMode && currentForm && (
-              <Button
-                variant="light"
-                color="red"
-                leftSection={<IconTrash size={18} />}
-                onClick={openDeleteModal}
-              >
-                Delete Form
-              </Button>
+            {currentForm && (
+              <Group gap="sm">
+                <Button
+                  variant="light"
+                  color="green"
+                  leftSection={<IconCheck size={18} />}
+                  onClick={handleFinish}
+                  disabled={pages.length === 0}
+                >
+                  Finish Form
+                </Button>
+                {isEditMode && (
+                  <Button
+                    variant="light"
+                    color="red"
+                    leftSection={<IconTrash size={18} />}
+                    onClick={openDeleteModal}
+                  >
+                    Delete Form
+                  </Button>
+                )}
+              </Group>
             )}
           </Group>
           <Title order={1} size="2.5rem">
@@ -793,6 +888,19 @@ function FormBuilder() {
                                     <IconPin size={14} />
                                   </ActionIcon>
                                 )}
+                                <ActionIcon
+                                  color="purple"
+                                  variant="light"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleOpenNavigationRules(page)
+                                  }}
+                                  disabled={loading}
+                                  size="sm"
+                                  title="Configure Navigation Rules"
+                                >
+                                  <IconRoute size={14} />
+                                </ActionIcon>
                                 <ActionIcon
                                   color="blue"
                                   variant="light"
@@ -1366,6 +1474,164 @@ function FormBuilder() {
                   </Button>
                 )}
               </Group>
+            </Stack>
+          )}
+        </Modal>
+
+        {/* Navigation Rules Modal */}
+        <Modal
+          opened={navigationRulesModalOpened}
+          onClose={() => {
+            closeNavigationRulesModal()
+            setSelectedPageForRules(null)
+            setNavigationRules([])
+            setRuleSourceFieldId('')
+            setRuleOperator('equals')
+            setRuleValue('')
+            setRuleTargetPageId('')
+            setRuleIsDefault(false)
+            setEditingRuleId(null)
+          }}
+          title={`Navigation Rules: ${selectedPageForRules?.title || ''}`}
+          size="xl"
+          centered
+        >
+          {selectedPageForRules && (
+            <Stack gap="md">
+              <Text size="sm" c="dimmed">
+                Configure conditional navigation for this page. When a user completes this page, the form will navigate to different pages based on their answers.
+              </Text>
+              <Divider />
+              
+              {/* Existing Rules */}
+              {navigationRules.length > 0 && (
+                <Stack gap="sm">
+                  <Title order={4}>Existing Rules</Title>
+                  {navigationRules.map((rule) => (
+                    <Paper key={rule.id} p="sm" withBorder>
+                      <Group justify="space-between">
+                        <div style={{ flex: 1 }}>
+                          {rule.is_default ? (
+                            <Text size="sm" fw={500}>Default: Go to {pages.find(p => p.id === rule.target_page_id)?.title || 'Unknown Page'}</Text>
+                          ) : (
+                            <Text size="sm">
+                              If <strong>{fields.find(f => f.id === rule.source_field_id)?.label || 'Unknown Field'}</strong>{' '}
+                              {rule.operator === 'equals' && 'equals'}
+                              {rule.operator === 'not_equals' && 'does not equal'}
+                              {rule.operator === 'contains' && 'contains'}
+                              {rule.operator === 'greater_than' && 'is greater than'}
+                              {rule.operator === 'less_than' && 'is less than'}
+                              {rule.operator === 'is_empty' && 'is empty'}
+                              {rule.operator === 'is_not_empty' && 'is not empty'}
+                              {' '}
+                              {rule.value && `"${rule.value}"`}
+                              {' '}
+                              → Go to <strong>{pages.find(p => p.id === rule.target_page_id)?.title || 'Unknown Page'}</strong>
+                            </Text>
+                          )}
+                        </div>
+                        <ActionIcon
+                          color="red"
+                          variant="light"
+                          onClick={() => handleDeleteNavigationRule(rule.id)}
+                          disabled={loading}
+                          size="sm"
+                        >
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Group>
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
+
+              <Divider />
+
+              {/* Add New Rule Form */}
+              <Title order={4}>Add New Rule</Title>
+              <Stack gap="md">
+                <Checkbox
+                  label="Default Rule"
+                  description="This rule will be used if no other rules match. Only one default rule per page."
+                  checked={ruleIsDefault}
+                  onChange={(e) => {
+                    setRuleIsDefault(e.currentTarget.checked)
+                    if (e.currentTarget.checked) {
+                      setRuleSourceFieldId('')
+                      setRuleOperator('equals')
+                      setRuleValue('')
+                    }
+                  }}
+                />
+
+                {!ruleIsDefault && (
+                  <>
+                    <Select
+                      label="Source Field"
+                      description="Field on this page to check"
+                      placeholder="Select a field"
+                      value={ruleSourceFieldId}
+                      onChange={(val) => setRuleSourceFieldId(val || '')}
+                      data={fields.map(f => ({ value: f.id.toString(), label: f.label }))}
+                      required={!ruleIsDefault}
+                    />
+
+                    <Select
+                      label="Operator"
+                      value={ruleOperator}
+                      onChange={(val) => setRuleOperator(val || 'equals')}
+                      data={[
+                        { value: 'equals', label: 'Equals' },
+                        { value: 'not_equals', label: 'Not Equals' },
+                        { value: 'contains', label: 'Contains' },
+                        { value: 'not_contains', label: 'Not Contains' },
+                        { value: 'greater_than', label: 'Greater Than' },
+                        { value: 'less_than', label: 'Less Than' },
+                        { value: 'greater_equal', label: 'Greater or Equal' },
+                        { value: 'less_equal', label: 'Less or Equal' },
+                        { value: 'is_empty', label: 'Is Empty' },
+                        { value: 'is_not_empty', label: 'Is Not Empty' },
+                        { value: 'in', label: 'In (comma-separated)' },
+                        { value: 'not_in', label: 'Not In (comma-separated)' },
+                      ]}
+                      required={!ruleIsDefault}
+                    />
+
+                    {ruleOperator !== 'is_empty' && ruleOperator !== 'is_not_empty' && (
+                      <TextInput
+                        label="Value"
+                        placeholder="Enter value to compare"
+                        value={ruleValue}
+                        onChange={(e) => setRuleValue(e.currentTarget.value)}
+                        required={!ruleIsDefault && ruleOperator !== 'is_empty' && ruleOperator !== 'is_not_empty'}
+                      />
+                    )}
+                  </>
+                )}
+
+                <Select
+                  label="Target Page"
+                  description="Page to navigate to when condition is met"
+                  placeholder="Select target page"
+                  value={ruleTargetPageId}
+                  onChange={(val) => setRuleTargetPageId(val || '')}
+                  data={pages
+                    .filter(p => p.id !== selectedPageForRules.id)
+                    .map(p => ({ value: p.id.toString(), label: p.title }))}
+                  required
+                />
+
+                <Button
+                  onClick={handleCreateNavigationRule}
+                  loading={loading}
+                  leftSection={<IconPlus size={18} />}
+                  variant="gradient"
+                  gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                  fullWidth
+                >
+                  Add Navigation Rule
+                </Button>
+              </Stack>
             </Stack>
           )}
         </Modal>
