@@ -644,28 +644,15 @@ function FormBuilder() {
             >
               Back to Home
             </Button>
-            {currentForm && (
-              <Group gap="sm">
-                <Button
-                  variant="light"
-                  color="green"
-                  leftSection={<IconCheck size={18} />}
-                  onClick={handleFinish}
-                  disabled={pages.length === 0}
-                >
-                  Finish Form
-                </Button>
-                {isEditMode && (
-                  <Button
-                    variant="light"
-                    color="red"
-                    leftSection={<IconTrash size={18} />}
-                    onClick={openDeleteModal}
-                  >
-                    Delete Form
-                  </Button>
-                )}
-              </Group>
+            {currentForm && isEditMode && (
+              <Button
+                variant="light"
+                color="red"
+                leftSection={<IconTrash size={18} />}
+                onClick={openDeleteModal}
+              >
+                Delete Form
+              </Button>
             )}
           </Group>
           <Title order={1} size="2.5rem">
@@ -710,17 +697,17 @@ function FormBuilder() {
 
         {/* Step 1: Create/Edit Form */}
         {activeStep === 0 && (
-          <Card shadow="md" padding="xl" radius="md" withBorder>
-            <Title order={2} mb="lg">{isEditMode ? 'Edit Form' : 'Create Form'}</Title>
+          <Card shadow="sm" padding="md" radius="md" withBorder>
+            <Title order={4} mb="md">{isEditMode ? 'Edit Form' : 'Create Form'}</Title>
             <form onSubmit={handleCreateForm}>
-              <Stack gap="md">
+              <Stack gap="sm">
                 <TextInput
                   label="Form Title"
                   placeholder="e.g., Customer Feedback Survey"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.currentTarget.value)}
                   required
-                  size="md"
+                  size="sm"
                 />
                 <Textarea
                   label="Description"
@@ -728,13 +715,13 @@ function FormBuilder() {
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.currentTarget.value)}
                   rows={3}
-                  size="md"
+                  size="sm"
                 />
                 <Button
                   type="submit"
                   loading={loading}
                   fullWidth
-                  size="md"
+                  size="sm"
                   variant="gradient"
                   gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
                 >
@@ -748,61 +735,23 @@ function FormBuilder() {
         {/* Step 2: Create Pages */}
         {activeStep === 1 && currentForm && (
           <Grid>
-            <Grid.Col span={{ base: 12, md: 8 }}>
-              <Card shadow="md" padding="xl" radius="md" withBorder>
-                <Group mb="lg">
-                  <Button
-                    variant="light"
-                    onClick={() => setActiveStep(0)}
-                    leftSection={<IconArrowLeft size={18} />}
-                  >
-                    Back to Form
-                  </Button>
-                </Group>
-                <Title order={2} mb="lg">Add Pages to "{currentForm.title}"</Title>
-                <form onSubmit={handleCreatePage}>
-                  <Stack gap="md">
-                    <TextInput
-                      label="Page Title"
-                      placeholder="e.g., Basic Information"
-                      value={pageTitle}
-                      onChange={(e) => setPageTitle(e.currentTarget.value)}
-                      required
-                      size="md"
-                    />
-                    <Textarea
-                      label="Description"
-                      placeholder="Page description"
-                      value={pageDescription}
-                      onChange={(e) => setPageDescription(e.currentTarget.value)}
-                      rows={2}
-                      size="md"
-                    />
-                    <Checkbox
-                      label="Mark as first page"
-                      description={pages.some(p => p.is_first) ? "Note: This will unmark the current first page" : "This will be the starting page of the form"}
-                      checked={isFirstPage}
-                      onChange={(e) => setIsFirstPage(e.currentTarget.checked)}
-                    />
-                    <Button
-                      type="submit"
-                      loading={loading}
-                      leftSection={<IconPlus size={18} />}
-                      variant="gradient"
-                      gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
-                      fullWidth
-                    >
-                      Add Page
-                    </Button>
-                  </Stack>
-                </form>
-              </Card>
-            </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
               <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
                 <Stack gap="md">
-                  <Group justify="space-between">
+                  <Group justify="space-between" align="center">
                     <Title order={4}>Pages ({pages.length})</Title>
+                    {currentForm && (
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="green"
+                        leftSection={<IconCheck size={16} />}
+                        onClick={handleFinish}
+                        disabled={pages.length === 0}
+                      >
+                        Finish
+                      </Button>
+                    )}
                   </Group>
                   <Divider />
                   {pages.length === 0 ? (
@@ -936,41 +885,96 @@ function FormBuilder() {
                 </Stack>
               </Card>
             </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 8 }}>
+              <Card shadow="sm" padding="md" radius="md" withBorder>
+                <Group mb="md">
+                  <Button
+                    variant="light"
+                    size="sm"
+                    onClick={() => setActiveStep(0)}
+                    leftSection={<IconArrowLeft size={16} />}
+                  >
+                    Back to Form
+                  </Button>
+                </Group>
+                <Title order={4} mb="md">Add Pages to "{currentForm.title}"</Title>
+                <form onSubmit={handleCreatePage}>
+                  <Stack gap="sm">
+                    <TextInput
+                      label="Page Title"
+                      placeholder="e.g., Basic Information"
+                      value={pageTitle}
+                      onChange={(e) => setPageTitle(e.currentTarget.value)}
+                      required
+                      size="sm"
+                    />
+                    <Textarea
+                      label="Description"
+                      placeholder="Page description"
+                      value={pageDescription}
+                      onChange={(e) => setPageDescription(e.currentTarget.value)}
+                      rows={2}
+                      size="sm"
+                    />
+                    <Checkbox
+                      label="Mark as first page"
+                      description={pages.some(p => p.is_first) ? "Note: This will unmark the current first page" : "This will be the starting page of the form"}
+                      checked={isFirstPage}
+                      onChange={(e) => setIsFirstPage(e.currentTarget.checked)}
+                      size="sm"
+                    />
+                    <Button
+                      type="submit"
+                      loading={loading}
+                      leftSection={<IconPlus size={16} />}
+                      variant="gradient"
+                      gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                      fullWidth
+                      size="sm"
+                    >
+                      Add Page
+                    </Button>
+                  </Stack>
+                </form>
+              </Card>
+            </Grid.Col>
           </Grid>
         )}
 
         {/* Step 3: Create Fields */}
         {activeStep === 2 && currentForm && (
-          <Card shadow="md" padding="xl" radius="md" withBorder>
-            <Group mb="lg">
+          <Card shadow="sm" padding="md" radius="md" withBorder>
+            <Group mb="md">
               <Button
                 variant="light"
+                size="sm"
                 onClick={() => {
                   setActiveStep(1)
                   setCurrentPage(null)
                   setFields([])
                 }}
-                leftSection={<IconArrowLeft size={18} />}
+                leftSection={<IconArrowLeft size={16} />}
               >
                 Back to Pages
               </Button>
             </Group>
             {pages.length === 0 ? (
-              <Stack gap="md" align="center" py="xl">
-                <Alert icon={<IconAlertCircle size={20} />} title="No Pages Available" color="yellow">
+              <Stack gap="sm" align="center" py="md">
+                <Alert icon={<IconAlertCircle size={18} />} title="No Pages Available" color="yellow" size="sm">
                   You need to create at least one page before adding fields.
                 </Alert>
                 <Button
                   variant="light"
+                  size="sm"
                   onClick={() => setActiveStep(1)}
-                  leftSection={<IconArrowLeft size={18} />}
+                  leftSection={<IconArrowLeft size={16} />}
                 >
                   Go Back to Add Pages
                 </Button>
               </Stack>
             ) : !currentPage ? (
-              <Stack gap="md">
-                <Alert icon={<IconAlertCircle size={20} />} title="Select a Page" color="blue">
+              <Stack gap="sm">
+                <Alert icon={<IconAlertCircle size={18} />} title="Select a Page" color="blue" size="sm">
                   Please select a page to add fields to.
                 </Alert>
                 <Select
@@ -987,14 +991,133 @@ function FormBuilder() {
                     value: page.id.toString(),
                     label: page.title + (page.is_first ? ' (First Page)' : ''),
                   }))}
-                  size="md"
+                  size="sm"
                 />
               </Stack>
             ) : (
               <Grid>
+                <Grid.Col span={{ base: 12, md: 4 }}>
+                  <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
+                    <Stack gap="md">
+                      <Group justify="space-between" align="center">
+                        <Title order={4}>Fields ({fields.length})</Title>
+                        {currentForm && (
+                          <Button
+                            size="sm"
+                            variant="light"
+                            color="green"
+                            leftSection={<IconCheck size={16} />}
+                            onClick={handleFinish}
+                            disabled={pages.length === 0}
+                          >
+                            Finish
+                          </Button>
+                        )}
+                      </Group>
+                      <Divider />
+                      {fields.length === 0 ? (
+                        <Text size="sm" c="dimmed" ta="center" py="xl">
+                          No fields added yet
+                        </Text>
+                      ) : (
+                        <ScrollArea h={600}>
+                          <Stack gap="xs">
+                            {fields.map((field, index) => (
+                              <Paper 
+                                key={field.id} 
+                                p="sm" 
+                                withBorder
+                                style={{ 
+                                  borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
+                                  borderWidth: editingFieldId === field.id ? 2 : undefined,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
+                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-indigo-4)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent'
+                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-gray-4)'
+                                }}
+                                onClick={() => handleEditField(field)}
+                              >
+                                <Group gap="xs" wrap="nowrap">
+                                  <Stack gap={2}>
+                                    <ActionIcon
+                                      color="gray"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleMoveField(field.id, 'up')
+                                      }}
+                                      disabled={index === 0 || loading}
+                                      size="xs"
+                                    >
+                                      <IconArrowUp size={12} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      color="gray"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleMoveField(field.id, 'down')
+                                      }}
+                                      disabled={index === fields.length - 1 || loading}
+                                      size="xs"
+                                    >
+                                      <IconArrowDown size={12} />
+                                    </ActionIcon>
+                                  </Stack>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <Text fw={500} size="sm" truncate>{field.label}</Text>
+                                    <Group gap={4} mt={4}>
+                                      <Badge variant="light" size="xs">{field.field_type}</Badge>
+                                      {field.is_required && (
+                                        <Badge color="red" variant="light" size="xs">Required</Badge>
+                                      )}
+                                    </Group>
+                                  </div>
+                                  <Group gap={2}>
+                                    <ActionIcon
+                                      color="blue"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleEditField(field)
+                                      }}
+                                      disabled={editingFieldId === field.id}
+                                      size="sm"
+                                    >
+                                      <IconEdit size={14} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      color="red"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteField(field.id)
+                                      }}
+                                      disabled={loading}
+                                      size="sm"
+                                    >
+                                      <IconTrash size={14} />
+                                    </ActionIcon>
+                                  </Group>
+                                </Group>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        </ScrollArea>
+                      )}
+                    </Stack>
+                  </Card>
+                </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 8 }}>
+                  <Card shadow="sm" padding="md" radius="md" withBorder>
                   <form onSubmit={handleCreateField}>
-                  <Stack gap="md">
+                  <Stack gap="sm">
                     <Group grow>
                       <TextInput
                         label="Field Name"
@@ -1002,7 +1125,7 @@ function FormBuilder() {
                         value={fieldName}
                         onChange={(e) => setFieldName(e.currentTarget.value)}
                         required
-                        size="md"
+                        size="sm"
                         disabled={!currentPage}
                       />
                       <TextInput
@@ -1011,7 +1134,7 @@ function FormBuilder() {
                         value={fieldLabel}
                         onChange={(e) => setFieldLabel(e.currentTarget.value)}
                         required
-                        size="md"
+                        size="sm"
                         disabled={!currentPage}
                       />
                     </Group>
@@ -1021,7 +1144,7 @@ function FormBuilder() {
                       onChange={(val) => handleFieldTypeChange(val || 'text')}
                       data={FIELD_TYPES}
                       required
-                      size="md"
+                      size="sm"
                       disabled={!currentPage}
                     />
                     <TextInput
@@ -1029,7 +1152,7 @@ function FormBuilder() {
                       placeholder="Enter placeholder text"
                       value={fieldPlaceholder}
                       onChange={(e) => setFieldPlaceholder(e.currentTarget.value)}
-                      size="md"
+                      size="sm"
                       disabled={!currentPage}
                     />
                     <TextInput
@@ -1037,20 +1160,20 @@ function FormBuilder() {
                       placeholder="Additional help text"
                       value={fieldHelpText}
                       onChange={(e) => setFieldHelpText(e.currentTarget.value)}
-                      size="md"
+                      size="sm"
                       disabled={!currentPage}
                     />
 
                 {/* Options UI for select/radio/checkbox */}
                 {(fieldType === 'select' || fieldType === 'radio' || fieldType === 'checkbox') && (
-                  <Paper p="md" withBorder>
-                    <Text fw={500} size="sm" mb="md">
+                  <Paper p="sm" withBorder>
+                    <Text fw={500} size="sm" mb="sm">
                       Options <Text component="span" c="red">*</Text>
                     </Text>
                     {fieldChoices.length > 0 && (
-                      <Stack gap="xs" mb="md">
+                      <Stack gap="xs" mb="sm">
                         {fieldChoices.map((choice, index) => (
-                          <Paper key={index} p="sm" withBorder>
+                          <Paper key={index} p="xs" withBorder>
                             <Group justify="space-between">
                               <div>
                                 <Text fw={500} size="sm">{choice.label}</Text>
@@ -1059,9 +1182,10 @@ function FormBuilder() {
                               <ActionIcon
                                 color="red"
                                 variant="light"
+                                size="sm"
                                 onClick={() => handleRemoveChoice(index)}
                               >
-                                <IconTrash size={16} />
+                                <IconTrash size={14} />
                               </ActionIcon>
                             </Group>
                           </Paper>
@@ -1086,10 +1210,10 @@ function FormBuilder() {
                       type="button"
                       onClick={handleAddChoice}
                       disabled={!newChoiceValue.trim() || !newChoiceLabel.trim()}
-                      leftSection={<IconPlus size={16} />}
+                      leftSection={<IconPlus size={14} />}
                       variant="light"
                       fullWidth
-                      mt="sm"
+                      mt="xs"
                       size="sm"
                     >
                       Add Option
@@ -1104,22 +1228,22 @@ function FormBuilder() {
 
                 {/* Rating configuration */}
                 {fieldType === 'rating' && (
-                  <Paper p="md" withBorder>
-                    <Text fw={500} size="sm" mb="md">Rating Range</Text>
+                  <Paper p="sm" withBorder>
+                    <Text fw={500} size="sm" mb="sm">Rating Range</Text>
                     <Group grow>
                       <NumberInput
                         label="Minimum"
                         value={ratingMin}
                         onChange={(val) => setRatingMin(Number(val) || 1)}
                         min={1}
-                        size="md"
+                        size="sm"
                       />
                       <NumberInput
                         label="Maximum"
                         value={ratingMax}
                         onChange={(val) => setRatingMax(Number(val) || 5)}
                         min={ratingMin + 1}
-                        size="md"
+                        size="sm"
                       />
                     </Group>
                     <Text size="xs" c="dimmed" mt="xs">
@@ -1133,16 +1257,18 @@ function FormBuilder() {
                       checked={fieldRequired}
                       onChange={(e) => setFieldRequired(e.currentTarget.checked)}
                       disabled={!currentPage}
+                      size="sm"
                     />
 
                     <Group>
                       <Button
                         type="submit"
                         loading={loading}
-                        leftSection={editingFieldId ? <IconCheck size={18} /> : <IconPlus size={18} />}
+                        leftSection={editingFieldId ? <IconCheck size={16} /> : <IconPlus size={16} />}
                         variant="gradient"
                         gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
                         disabled={!currentPage}
+                        size="sm"
                       >
                         {editingFieldId ? 'Update Field' : 'Add Field'}
                       </Button>
@@ -1150,6 +1276,7 @@ function FormBuilder() {
                     <Button
                       variant="light"
                       onClick={handleCancelEdit}
+                      size="sm"
                     >
                       Cancel
                     </Button>
@@ -1161,105 +1288,14 @@ function FormBuilder() {
                       setCurrentPage(null)
                       setFields([])
                     }}
-                    leftSection={<IconArrowLeft size={18} />}
+                    leftSection={<IconArrowLeft size={16} />}
+                    size="sm"
                   >
                     Back to Pages
-                  </Button>
-                  <Button
-                    variant="gradient"
-                    gradient={{ from: 'green', to: 'teal', deg: 90 }}
-                    onClick={() => {
-                      setActiveStep(3)
-                      setCurrentPage(null)
-                    }}
-                  >
-                    Finish
                   </Button>
                 </Group>
                   </Stack>
                   </form>
-                </Grid.Col>
-                <Grid.Col span={{ base: 12, md: 4 }}>
-                  <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
-                    <Stack gap="md">
-                      <Group justify="space-between">
-                        <Title order={4}>Fields ({fields.length})</Title>
-                      </Group>
-                      <Divider />
-                      {fields.length === 0 ? (
-                        <Text size="sm" c="dimmed" ta="center" py="xl">
-                          No fields added yet
-                        </Text>
-                      ) : (
-                        <ScrollArea h={600}>
-                          <Stack gap="xs">
-                            {fields.map((field, index) => (
-                              <Paper 
-                                key={field.id} 
-                                p="sm" 
-                                withBorder
-                                style={{ 
-                                  borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
-                                  borderWidth: editingFieldId === field.id ? 2 : undefined
-                                }}
-                              >
-                                <Group gap="xs" wrap="nowrap">
-                                  <Stack gap={2}>
-                                    <ActionIcon
-                                      color="gray"
-                                      variant="light"
-                                      onClick={() => handleMoveField(field.id, 'up')}
-                                      disabled={index === 0 || loading}
-                                      size="xs"
-                                    >
-                                      <IconArrowUp size={12} />
-                                    </ActionIcon>
-                                    <ActionIcon
-                                      color="gray"
-                                      variant="light"
-                                      onClick={() => handleMoveField(field.id, 'down')}
-                                      disabled={index === fields.length - 1 || loading}
-                                      size="xs"
-                                    >
-                                      <IconArrowDown size={12} />
-                                    </ActionIcon>
-                                  </Stack>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <Text fw={500} size="sm" truncate>{field.label}</Text>
-                                    <Group gap={4} mt={4}>
-                                      <Badge variant="light" size="xs">{field.field_type}</Badge>
-                                      {field.is_required && (
-                                        <Badge color="red" variant="light" size="xs">Required</Badge>
-                                      )}
-                                    </Group>
-                                  </div>
-                                  <Group gap={2}>
-                                    <ActionIcon
-                                      color="blue"
-                                      variant="light"
-                                      onClick={() => handleEditField(field)}
-                                      disabled={editingFieldId === field.id}
-                                      size="sm"
-                                    >
-                                      <IconEdit size={14} />
-                                    </ActionIcon>
-                                    <ActionIcon
-                                      color="red"
-                                      variant="light"
-                                      onClick={() => handleDeleteField(field.id)}
-                                      disabled={loading}
-                                      size="sm"
-                                    >
-                                      <IconTrash size={14} />
-                                    </ActionIcon>
-                                  </Group>
-                                </Group>
-                              </Paper>
-                            ))}
-                          </Stack>
-                        </ScrollArea>
-                      )}
-                    </Stack>
                   </Card>
                 </Grid.Col>
               </Grid>

@@ -122,3 +122,48 @@ class SubmissionService:
         
         return result
 
+    @staticmethod
+    def get_form_submissions(db: Session, form_id: int):
+        """Get all completed submissions for a form"""
+        submissions = db.query(Submission).options(
+            joinedload(Submission.responses).joinedload(FieldResponse.field)
+        ).filter(
+            Submission.form_id == form_id,
+            Submission.status == "completed"
+        ).order_by(Submission.completed_at.desc()).all()
+        
+        result = []
+        for submission in submissions:
+            responses_dict = {}
+            for response in submission.responses:
+                field = response.field
+                responses_dict[field.name] = {
+                    "field_id": field.id,
+                    "label": field.label,
+                    "value": response.value,
+                    "field_type": field.field_type.value
+                }
+            
+            result.append({
+                "id": submission.id,
+                "session_id": submission.session_id,
+                "status": submission.status,
+                "created_at": submission.created_at.isoformat() if submission.created_at else None,
+                "completed_at": submission.completed_at.isoformat() if submission.completed_at else None,
+                "responses": responses_dict
+            })
+        
+        return result
+
+    @staticmethod
+    def delete_submission(db: Session, submission_id: int) -> bool:
+        """Delete a submission and all its responses"""
+        submission = db.query(Submission).filter(Submission.id == submission_id).first()
+        if not submission:
+            return False
+        
+        # Cascade delete will handle FieldResponse deletion
+        db.delete(submission)
+        db.commit()
+        return True
+

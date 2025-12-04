@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Container, Title, Text, Button, Card, Grid, Stack, Loader, Alert, Group, Badge, Modal } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconFileText, IconPlus, IconCalendar, IconArrowRight, IconAlertCircle, IconEdit, IconTrash } from '@tabler/icons-react'
+import { IconFileText, IconPlus, IconCalendar, IconArrowRight, IconAlertCircle, IconEdit, IconTrash, IconList } from '@tabler/icons-react'
 import { formAPI, builderAPI, Form } from '../services/api'
 
 function Home() {
@@ -159,6 +159,17 @@ function Home() {
                           style={{ flex: 1 }}
                         >
                           Start
+                        </Button>
+                        <Button
+                          component={Link}
+                          to={`/responses/${form.id}`}
+                          size="xs"
+                          variant="light"
+                          color="green"
+                          leftSection={<IconList size={14} />}
+                          style={{ flex: 1 }}
+                        >
+                          View
                         </Button>
                         <Button
                           component={Link}

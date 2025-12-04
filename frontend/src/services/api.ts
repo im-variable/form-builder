@@ -146,6 +146,17 @@ export const formAPI = {
   completeSubmission: async (sessionId: string): Promise<void> => {
     await api.post(`/submission/${sessionId}/complete`)
   },
+
+  // Get all submissions for a form
+  getFormSubmissions: async (formId: number): Promise<any> => {
+    const response = await api.get(`/submission/form/${formId}/submissions`)
+    return response.data
+  },
+
+  // Delete a submission
+  deleteSubmission: async (submissionId: number): Promise<void> => {
+    await api.delete(`/submission/${submissionId}/delete`)
+  },
 }
 
 // Builder API Functions

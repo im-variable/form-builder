@@ -26,15 +26,6 @@ def create_submission(submission_data: SubmissionCreate, db: Session = Depends(g
     return submission
 
 
-@router.get("/{session_id}", response_model=SubmissionStatus)
-def get_submission(session_id: str, db: Session = Depends(get_db)):
-    """Get submission status by session ID"""
-    submission = SubmissionService.get_submission(db, session_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
-    return submission
-
-
 @router.post("/submit-answer", response_model=SubmitAnswerResponse)
 def submit_answer(answer_data: SubmitAnswerRequest, db: Session = Depends(get_db)):
     """
@@ -56,6 +47,22 @@ def submit_answer(answer_data: SubmitAnswerRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get("/form/{form_id}/submissions")
+def get_form_submissions(form_id: int, db: Session = Depends(get_db)):
+    """Get all completed submissions for a form"""
+    submissions = SubmissionService.get_form_submissions(db, form_id)
+    return {"form_id": form_id, "submissions": submissions}
+
+
+@router.get("/{session_id}", response_model=SubmissionStatus)
+def get_submission(session_id: str, db: Session = Depends(get_db)):
+    """Get submission status by session ID"""
+    submission = SubmissionService.get_submission(db, session_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return submission
+
+
 @router.post("/{session_id}/complete", status_code=200)
 def complete_submission(session_id: str, db: Session = Depends(get_db)):
     """Mark a submission as completed"""
@@ -72,5 +79,14 @@ def get_submission_responses(session_id: str, db: Session = Depends(get_db)):
     if not responses:
         raise HTTPException(status_code=404, detail="Submission not found or no responses")
     return responses
+
+
+@router.delete("/{submission_id}/delete")
+def delete_submission(submission_id: int, db: Session = Depends(get_db)):
+    """Delete a submission and all its responses"""
+    success = SubmissionService.delete_submission(db, submission_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return {"message": "Submission deleted successfully"}
 
 
