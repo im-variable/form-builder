@@ -99,8 +99,8 @@ class SubmissionService:
             return False
         
         submission.status = "completed"
-        from datetime import datetime
-        submission.completed_at = datetime.utcnow()
+        from datetime import datetime, timezone
+        submission.completed_at = datetime.now(timezone.utc)
         db.commit()
         return True
 

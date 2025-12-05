@@ -489,8 +489,8 @@ class FormRendererService:
         
         if is_complete:
             submission.status = "completed"
-            from datetime import datetime
-            submission.completed_at = datetime.utcnow()
+            from datetime import datetime, timezone
+            submission.completed_at = datetime.now(timezone.utc)
             db.commit()
             db.refresh(submission)
 
