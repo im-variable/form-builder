@@ -385,7 +385,7 @@ function FormView() {
                 >
                   Cancel
                 </Button>
-                {submissionId && formData.current_page.order > 0 && (
+                {submissionId && !formData.current_page.is_first && (
                   <Button
                     variant="default"
                     leftSection={<IconArrowLeft size={18} />}

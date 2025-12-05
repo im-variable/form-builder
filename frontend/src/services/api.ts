@@ -57,6 +57,7 @@ export interface RenderedPage {
   title: string
   description?: string
   order: number
+  is_first: boolean
   fields: Field[]
 }
 

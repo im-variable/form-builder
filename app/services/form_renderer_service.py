@@ -86,7 +86,7 @@ class FormRendererService:
             if not existing_answers or len(existing_answers) == 0:
                 submission.current_page_id = None
                 db.commit()
-                db.refresh(submission)
+            db.refresh(submission)
 
         # Get current answers from database
         db_answers = FormRendererService.get_current_answers(db, session_id)
@@ -205,7 +205,7 @@ class FormRendererService:
             # Evaluate conditions that affect THIS field (where field is the target)
             if target_conditions:
                 condition_result = ConditionEngine.evaluate_field_conditions(
-                    field.id,
+                field.id,
                     target_conditions,
                     condition_evaluation_answers
                 )
@@ -259,6 +259,7 @@ class FormRendererService:
             title=current_page.title,
             description=current_page.description,
             order=current_page.order,
+            is_first=current_page.is_first,
             fields=rendered_fields
         )
 
@@ -266,7 +267,7 @@ class FormRendererService:
         all_pages = db.query(Page).filter(Page.form_id == form_id).all()
         sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
         current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == current_page.id), 0)
-        
+
         # Determine next page
         navigation_rules = current_page.navigation_rules
         next_page_id = None
@@ -450,6 +451,7 @@ class FormRendererService:
                     title=current_page.title,
                     description=current_page.description,
                     order=current_page.order,
+                    is_first=current_page.is_first,
                     fields=rendered_fields
                 )
                 
@@ -500,7 +502,7 @@ class FormRendererService:
             is_complete=is_complete,
             progress=round(progress, 2)
         )
-    
+
     @staticmethod
     def render_page_for_submission(
         db: Session,
@@ -646,6 +648,7 @@ class FormRendererService:
             title=page.title,
             description=page.description,
             order=page.order,
+            is_first=page.is_first,
             fields=rendered_fields
         )
         
@@ -684,7 +687,7 @@ class FormRendererService:
         # Calculate progress
         total_pages = len(sorted_pages)
         progress = ((current_page_index + 1) / total_pages * 100) if total_pages > 0 else 0
-        
+
         # Check if complete
         current_page_field_names = [f.name for f in fields]
         current_page_has_answers = any(
@@ -699,7 +702,7 @@ class FormRendererService:
             submission.current_page_id = page.id
             db.commit()
             db.refresh(submission)
-        
+
         return FormRenderResponse(
             form_id=form_id,
             form_title=form.title,

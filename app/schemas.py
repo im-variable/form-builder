@@ -202,6 +202,7 @@ class RenderedPage(BaseModel):
     title: str
     description: Optional[str] = None
     order: int
+    is_first: bool = False
     fields: List[RenderedField]
 
 
