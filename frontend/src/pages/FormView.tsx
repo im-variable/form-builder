@@ -13,7 +13,7 @@ import {
   Alert,
   Paper,
 } from '@mantine/core'
-import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck } from '@tabler/icons-react'
+import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck, IconArrowLeft } from '@tabler/icons-react'
 import { formAPI, FormRenderResponse, SubmitAnswerRequest, Field } from '../services/api'
 import FieldRenderer from '../components/FieldRenderer'
 import { evaluateFieldConditions } from '../utils/conditionEvaluator'
@@ -27,6 +27,7 @@ function FormView() {
   const [error, setError] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [sessionId, setSessionId] = useState<string>('')
+  const [submissionId, setSubmissionId] = useState<number | null>(null)
   const currentPageIdRef = useRef<number | null>(null)
   
   // Local field visibility state for same-page conditions
@@ -90,7 +91,8 @@ function FormView() {
       const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       setSessionId(newSessionId)
 
-      await formAPI.createSubmission(id, newSessionId)
+      const submission = await formAPI.createSubmission(id, newSessionId)
+      setSubmissionId(submission.id)
       const data = await formAPI.renderForm(id, newSessionId, {})
       setFormData(data)
       currentPageIdRef.current = data.current_page.id
@@ -136,6 +138,43 @@ function FormView() {
     }))
   }
 
+  const handlePreviousPage = async () => {
+    if (!submissionId || !formData) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const updatedForm = await formAPI.getPreviousPageForSubmission(submissionId)
+      setFormData(updatedForm)
+      currentPageIdRef.current = updatedForm.current_page.id
+
+      // Initialize answers for the previous page
+      const newAnswers: Record<string, any> = {}
+      const newVisibility: Record<number, boolean> = {}
+      const newRequired: Record<number, boolean> = {}
+      
+      updatedForm.current_page.fields.forEach((field) => {
+        if (field.current_value !== undefined && field.current_value !== null && field.current_value !== '') {
+          newAnswers[field.name] = field.current_value
+        } else {
+          newAnswers[field.name] = ""
+        }
+        
+        newVisibility[field.id] = field.is_visible
+        newRequired[field.id] = field.is_required
+      })
+      
+      setAnswers(newAnswers)
+      setLocalFieldVisibility(newVisibility)
+      setLocalFieldRequired(newRequired)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to load previous page')
+      console.error('Error loading previous page:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -346,6 +385,16 @@ function FormView() {
                 >
                   Cancel
                 </Button>
+                {submissionId && formData.current_page.order > 0 && (
+                  <Button
+                    variant="default"
+                    leftSection={<IconArrowLeft size={18} />}
+                    onClick={handlePreviousPage}
+                    disabled={loading}
+                  >
+                    Back
+                  </Button>
+                )}
               </Group>
               <Button
                 type="submit"

@@ -166,6 +166,24 @@ export const formAPI = {
     await api.delete(`/submission/${submissionId}/delete`)
   },
 
+  // Render a specific page for a submission
+  renderPageForSubmission: async (submissionId: number, pageId: number): Promise<FormRenderResponse> => {
+    const response = await api.get(`/renderer/submission/${submissionId}/page/${pageId}`)
+    return response.data
+  },
+
+  // Get previous page for a submission
+  getPreviousPageForSubmission: async (submissionId: number): Promise<FormRenderResponse> => {
+    const response = await api.get(`/renderer/submission/${submissionId}/previous-page`)
+    return response.data
+  },
+
+  // Get next page for a submission
+  getNextPageForSubmission: async (submissionId: number): Promise<FormRenderResponse> => {
+    const response = await api.get(`/renderer/submission/${submissionId}/next-page`)
+    return response.data
+  },
+
 }
 
 // Builder API Functions

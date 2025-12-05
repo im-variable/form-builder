@@ -29,6 +29,11 @@ class SubmissionService:
     def get_submission(db: Session, session_id: str) -> Optional[Submission]:
         """Get submission by session ID"""
         return db.query(Submission).filter(Submission.session_id == session_id).first()
+    
+    @staticmethod
+    def get_submission_by_id(db: Session, submission_id: int) -> Optional[Submission]:
+        """Get submission by ID"""
+        return db.query(Submission).filter(Submission.id == submission_id).first()
 
     @staticmethod
     def submit_answer(

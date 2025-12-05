@@ -29,6 +29,20 @@ class FormRendererService:
             answers[field.name] = response.value
         
         return answers
+    
+    @staticmethod
+    def get_answers_by_submission_id(db: Session, submission_id: int) -> Dict[str, Any]:
+        """Get all current answers for a submission by submission ID"""
+        responses = db.query(FieldResponse).options(
+            joinedload(FieldResponse.field)
+        ).filter(FieldResponse.submission_id == submission_id).all()
+        
+        answers = {}
+        for response in responses:
+            field = response.field
+            answers[field.name] = response.value
+        
+        return answers
 
     @staticmethod
     def render_form(
@@ -258,19 +272,26 @@ class FormRendererService:
         next_page_id = None
         
         if navigation_rules:
+            # IMPORTANT: Merge db_answers with current_answers for navigation rule evaluation
+            # This ensures that when going back and updating fields, all answers are considered
+            # Priority: current_answers (from current page) override db_answers
+            navigation_answers = db_answers.copy() if db_answers else {}
+            if current_answers:
+                navigation_answers.update(current_answers)
+            
             # Use navigation rules to determine next page
+            # Conditions should take priority over sequential navigation
             next_page_id = ConditionEngine.determine_next_page(
                 current_page.id,
                 navigation_rules,
-                current_answers,
+                navigation_answers,  # Use merged answers
                 db
             )
             
-            # If no rule matched, fall back to sequential navigation
-            # This handles cases where:
-            # 1. No answers yet (initial render)
-            # 2. Navigation rules don't match current answers
-            # 3. No default rule is set
+            # Only fall back to sequential navigation if:
+            # 1. No navigation rule matched (next_page_id is None)
+            # 2. AND there's a next page in sequence
+            # This ensures conditions always take priority
             if next_page_id is None and current_page_index < len(sorted_pages) - 1:
                 # There's a next page
                 next_page_id = sorted_pages[current_page_index + 1].id
@@ -471,6 +492,214 @@ class FormRendererService:
             db.commit()
             db.refresh(submission)
 
+        return FormRenderResponse(
+            form_id=form_id,
+            form_title=form.title,
+            current_page=rendered_page,
+            next_page_id=next_page_id,
+            is_complete=is_complete,
+            progress=round(progress, 2)
+        )
+    
+    @staticmethod
+    def render_page_for_submission(
+        db: Session,
+        submission_id: int,
+        page_id: int
+    ) -> FormRenderResponse:
+        """
+        Render a specific page for a submission with populated data
+        
+        This method:
+        - Gets the submission by ID
+        - Renders the specified page
+        - Populates fields with existing answers from the submission
+        - Returns next page ID
+        """
+        from app.services.submission_service import SubmissionService
+        
+        # Get submission
+        submission = SubmissionService.get_submission_by_id(db, submission_id)
+        if not submission:
+            raise ValueError(f"Submission {submission_id} not found")
+        
+        form_id = submission.form_id
+        
+        # Get form
+        form = db.query(Form).filter(Form.id == form_id).first()
+        if not form:
+            raise ValueError(f"Form {form_id} not found")
+        
+        # Get the specified page
+        page = db.query(Page).options(
+            joinedload(Page.navigation_rules).joinedload(PageNavigationRule.source_field)
+        ).filter(
+            Page.id == page_id,
+            Page.form_id == form_id
+        ).first()
+        
+        if not page:
+            raise ValueError(f"Page {page_id} not found for form {form_id}")
+        
+        # Get all answers for this submission
+        db_answers = FormRendererService.get_answers_by_submission_id(db, submission_id)
+        
+        # Render fields for the page
+        fields = db.query(Field).options(
+            joinedload(Field.conditions).joinedload(FieldCondition.target_field)
+        ).filter(Field.page_id == page.id).order_by(Field.order).all()
+        
+        # Load conditions
+        all_field_conditions = db.query(FieldCondition).options(
+            joinedload(FieldCondition.source_field),
+            joinedload(FieldCondition.target_field)
+        ).filter(
+            FieldCondition.target_field_id.in_([f.id for f in fields])
+        ).all()
+        
+        target_field_conditions_map = {}
+        for condition in all_field_conditions:
+            if condition.target_field_id not in target_field_conditions_map:
+                target_field_conditions_map[condition.target_field_id] = []
+            target_field_conditions_map[condition.target_field_id].append(condition)
+        
+        # Build answers dict for condition evaluation
+        condition_evaluation_answers = db_answers.copy()
+        
+        # Ensure all fields from current page are included
+        for field in fields:
+            if field.name not in condition_evaluation_answers:
+                if field.default_value is not None and field.default_value != "":
+                    condition_evaluation_answers[field.name] = field.default_value
+                else:
+                    condition_evaluation_answers[field.name] = ""
+        
+        # Add default values for fields from other pages
+        all_form_fields = db.query(Field).filter(Field.page_id.in_(
+            db.query(Page.id).filter(Page.form_id == form_id)
+        )).all()
+        
+        for form_field in all_form_fields:
+            if form_field.name not in condition_evaluation_answers:
+                if form_field.default_value is not None and form_field.default_value != "":
+                    condition_evaluation_answers[form_field.name] = form_field.default_value
+        
+        # Render fields
+        rendered_fields = []
+        for field in fields:
+            target_conditions = target_field_conditions_map.get(field.id, [])
+            
+            is_visible = field.is_visible
+            is_required = field.is_required
+            
+            if target_conditions:
+                condition_result = ConditionEngine.evaluate_field_conditions(
+                    field.id,
+                    target_conditions,
+                    condition_evaluation_answers
+                )
+                
+                has_visibility_conditions = any(c.action.value in ["show", "hide"] for c in target_conditions)
+                has_require_conditions = any(c.action.value == "require" for c in target_conditions)
+                
+                if has_visibility_conditions:
+                    is_visible = condition_result["show"] and not condition_result["hide"]
+                
+                if has_require_conditions:
+                    is_required = condition_result["require"]
+            
+            # Get current value from submission answers
+            current_value = db_answers.get(field.name)
+            
+            # Include conditions for frontend evaluation (only same-page conditions)
+            field_conditions = []
+            if target_conditions:
+                for condition in target_conditions:
+                    source_field_page_id = condition.source_field.page_id
+                    if source_field_page_id == page.id:
+                        field_conditions.append({
+                            "source_field_name": condition.source_field.name,
+                            "operator": condition.operator.value,
+                            "value": condition.value,
+                            "action": condition.action.value
+                        })
+            
+            rendered_field = RenderedField(
+                id=field.id,
+                name=field.name,
+                label=field.label,
+                field_type=field.field_type,
+                placeholder=field.placeholder,
+                help_text=field.help_text,
+                is_required=field.is_required,
+                is_visible=is_visible,
+                default_value=field.default_value,
+                options=field.options,
+                validation_rules=field.validation_rules,
+                current_value=current_value,
+                conditions=field_conditions if field_conditions else None
+            )
+            rendered_fields.append(rendered_field)
+        
+        rendered_page = RenderedPage(
+            id=page.id,
+            title=page.title,
+            description=page.description,
+            order=page.order,
+            fields=rendered_fields
+        )
+        
+        # Get all pages and determine previous/next
+        all_pages = db.query(Page).filter(Page.form_id == form_id).all()
+        sorted_pages = sorted(all_pages, key=lambda p: (not p.is_first, p.order or 0))
+        current_page_index = next((i for i, p in enumerate(sorted_pages) if p.id == page.id), -1)
+        
+        # Determine next page
+        # IMPORTANT: Navigation rules (conditions) should take priority over sequential navigation
+        # This ensures that when going back and filling fields, conditions are properly evaluated
+        next_page_id = None
+        navigation_rules = page.navigation_rules
+        
+        if navigation_rules:
+            # First, evaluate navigation rules with current answers
+            # This will return a page ID if a condition matches, or None if no condition matches
+            next_page_id = ConditionEngine.determine_next_page(
+                page.id,
+                navigation_rules,
+                db_answers,
+                db
+            )
+            
+            # Only fall back to sequential navigation if:
+            # 1. No navigation rule matched (next_page_id is None)
+            # 2. AND there's a next page in sequence
+            # This ensures conditions always take priority
+            if next_page_id is None and current_page_index < len(sorted_pages) - 1:
+                next_page_id = sorted_pages[current_page_index + 1].id
+        else:
+            # No navigation rules, use sequential navigation
+            if current_page_index < len(sorted_pages) - 1:
+                next_page_id = sorted_pages[current_page_index + 1].id
+        
+        # Calculate progress
+        total_pages = len(sorted_pages)
+        progress = ((current_page_index + 1) / total_pages * 100) if total_pages > 0 else 0
+        
+        # Check if complete
+        current_page_field_names = [f.name for f in fields]
+        current_page_has_answers = any(
+            db_answers.get(field_name) is not None and db_answers.get(field_name) != ''
+            for field_name in current_page_field_names
+        )
+        is_complete = next_page_id is None and current_page_has_answers
+        
+        # Update submission's current_page_id to reflect the page we're viewing
+        # This is important for navigation rules to work correctly when going back
+        if submission.current_page_id != page.id:
+            submission.current_page_id = page.id
+            db.commit()
+            db.refresh(submission)
+        
         return FormRenderResponse(
             form_id=form_id,
             form_title=form.title,
