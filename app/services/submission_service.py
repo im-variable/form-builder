@@ -167,14 +167,3 @@ class SubmissionService:
         db.commit()
         return True
 
-    @staticmethod
-    def update_current_page(db: Session, session_id: str, page_id: int) -> bool:
-        """Update the current page ID for a submission"""
-        submission = db.query(Submission).filter(Submission.session_id == session_id).first()
-        if not submission:
-            return False
-        
-        submission.current_page_id = page_id
-        db.commit()
-        return True
-

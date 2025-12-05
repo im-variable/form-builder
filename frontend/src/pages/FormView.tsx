@@ -13,7 +13,7 @@ import {
   Alert,
   Paper,
 } from '@mantine/core'
-import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck, IconArrowLeft } from '@tabler/icons-react'
+import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck } from '@tabler/icons-react'
 import { formAPI, FormRenderResponse, SubmitAnswerRequest, Field } from '../services/api'
 import FieldRenderer from '../components/FieldRenderer'
 import { evaluateFieldConditions } from '../utils/conditionEvaluator'
@@ -27,7 +27,6 @@ function FormView() {
   const [error, setError] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [sessionId, setSessionId] = useState<string>('')
-  const [pageHistory, setPageHistory] = useState<number[]>([]) // Track page IDs in order
   const currentPageIdRef = useRef<number | null>(null)
   
   // Local field visibility state for same-page conditions
@@ -83,7 +82,7 @@ function FormView() {
     // Update local visibility state
     setLocalFieldVisibility(updatedVisibility)
     setLocalFieldRequired(updatedRequired)
-  }, [answers, formData, submitting, loading])
+  }, [answers, formData?.current_page.id, submitting, loading])
 
   const initializeForm = async (id: number) => {
     try {
@@ -95,7 +94,6 @@ function FormView() {
       const data = await formAPI.renderForm(id, newSessionId, {})
       setFormData(data)
       currentPageIdRef.current = data.current_page.id
-      setPageHistory([data.current_page.id]) // Initialize with first page
 
       // Initialize answers for all fields on the current page
       // Include all fields (even empty ones) so condition evaluation works correctly for same-page fields
@@ -132,63 +130,12 @@ function FormView() {
     // Normalize empty values: null, undefined, or empty string should be sent as empty string
     // This ensures the backend can properly evaluate "is_empty" conditions for same-page fields
     const normalizedValue = (value === null || value === undefined || value === '') ? '' : value
-    console.log(`[DEBUG] Field changed: ${fieldName} = ${normalizedValue} (type: ${typeof normalizedValue})`)
     setAnswers((prev) => ({
       ...prev,
       [fieldName]: normalizedValue,
     }))
   }
 
-  const handleGoBack = async () => {
-    if (!formData || !sessionId || pageHistory.length <= 1) return
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Get the previous page ID
-      const previousPageId = pageHistory[pageHistory.length - 2]
-
-      // Update the submission's current page
-      await formAPI.updateCurrentPage(sessionId, previousPageId)
-
-      // Render the previous page
-      const updatedForm = await formAPI.renderForm(parseInt(formId!), sessionId)
-      setFormData(updatedForm)
-      currentPageIdRef.current = updatedForm.current_page.id
-
-      // Update page history - remove the last page
-      setPageHistory((prev) => prev.slice(0, -1))
-
-      // Initialize answers for the previous page
-      // Include all fields (even empty ones) so condition evaluation works correctly
-      const newAnswers: Record<string, any> = {}
-      const newVisibility: Record<number, boolean> = {}
-      const newRequired: Record<number, boolean> = {}
-      
-      updatedForm.current_page.fields.forEach((field) => {
-        if (field.current_value !== undefined && field.current_value !== null) {
-          newAnswers[field.name] = field.current_value
-        } else {
-          // Initialize empty fields as empty string so IS_EMPTY conditions can evaluate
-          newAnswers[field.name] = ""
-        }
-        
-        // Initialize visibility and required from backend (conditions already evaluated)
-        newVisibility[field.id] = field.is_visible
-        newRequired[field.id] = field.is_required
-      })
-      
-      setAnswers(newAnswers)
-      setLocalFieldVisibility(newVisibility)
-      setLocalFieldRequired(newRequired)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to go back')
-      console.error('Error going back:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -198,8 +145,43 @@ function FormView() {
       setSubmitting(true)
       setError(null)
 
-      const visibleFields = formData.current_page.fields.filter((f) => f.is_visible)
+      // Get visible fields with local required state
+      const visibleFields = formData.current_page.fields
+        .filter((f) => {
+          const isVisible = localFieldVisibility[f.id] !== undefined 
+            ? localFieldVisibility[f.id] 
+            : f.is_visible
+          return isVisible
+        })
 
+      // Validate required fields
+      const missingRequiredFields: string[] = []
+      for (const field of visibleFields) {
+        const isRequired = localFieldRequired[field.id] !== undefined 
+          ? localFieldRequired[field.id] 
+          : field.is_required
+        
+        if (isRequired) {
+          const value = answers[field.name]
+          // Check if value is empty (null, undefined, empty string, or empty array)
+          const isEmpty = value === undefined || 
+                         value === null || 
+                         value === '' || 
+                         (Array.isArray(value) && value.length === 0)
+          
+          if (isEmpty) {
+            missingRequiredFields.push(field.label || field.name)
+          }
+        }
+      }
+
+      if (missingRequiredFields.length > 0) {
+        setError(`Please fill in all required fields: ${missingRequiredFields.join(', ')}`)
+        setSubmitting(false)
+        return
+      }
+
+      // Submit answers for all visible fields
       for (const field of visibleFields) {
         const value = answers[field.name]
         if (value !== undefined && value !== null && value !== '') {
@@ -226,14 +208,6 @@ function FormView() {
         setFormData(updatedForm)
         currentPageIdRef.current = updatedForm.current_page.id
         
-        // Update page history - add new page if it's different
-        setPageHistory((prev) => {
-          const lastPageId = prev[prev.length - 1]
-          if (updatedForm.current_page.id !== lastPageId) {
-            return [...prev, updatedForm.current_page.id]
-          }
-          return prev
-        })
         
         // Initialize answers for the new page
         // Include all fields (even empty ones) so condition evaluation works correctly
@@ -365,16 +339,6 @@ function FormView() {
 
             <Group justify="space-between" mt="xl" pt="md" style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}>
               <Group>
-                {pageHistory.length > 1 && (
-                  <Button
-                    variant="default"
-                    leftSection={<IconArrowLeft size={18} />}
-                    onClick={handleGoBack}
-                    disabled={loading}
-                  >
-                    Back
-                  </Button>
-                )}
                 <Button
                   variant="default"
                   leftSection={<IconX size={18} />}

@@ -89,7 +89,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
       case 'radio':
         return (
           <Radio.Group
-            value={value || ''}
+            value={value || null}
             onChange={onChange}
             required={field.is_required}
           >

@@ -166,10 +166,6 @@ export const formAPI = {
     await api.delete(`/submission/${submissionId}/delete`)
   },
 
-  // Update current page (for navigation)
-  updateCurrentPage: async (sessionId: string, pageId: number): Promise<void> => {
-    await api.put(`/submission/${sessionId}/current-page/${pageId}`)
-  },
 }
 
 // Builder API Functions

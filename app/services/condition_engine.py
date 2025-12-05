@@ -114,21 +114,12 @@ class ConditionEngine:
             source_field_name = condition.source_field.name
             field_value = answers.get(source_field_name)
 
-            # Debug logging (temporary)
-            print(f"[DEBUG] Evaluating condition for field {field_id}")
-            print(f"[DEBUG] Source field name: {source_field_name}")
-            print(f"[DEBUG] Field value from answers: {field_value} (type: {type(field_value)})")
-            print(f"[DEBUG] Condition operator: {condition.operator}")
-            print(f"[DEBUG] Condition value: {condition.value}")
-
             # Evaluate condition
             condition_met = ConditionEngine.evaluate_operator(
                 condition.operator,
                 field_value,
                 condition.value or ""
             )
-            
-            print(f"[DEBUG] Condition met: {condition_met}")
 
             if condition_met:
                 action = condition.action.value
