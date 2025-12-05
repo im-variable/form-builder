@@ -113,7 +113,7 @@ class FieldConditionCreate(FieldConditionBase):
 
 class FieldConditionResponse(FieldConditionBase):
     id: int
-    source_field: Optional["FieldResponse"] = None  # Include source field data for display
+    source_field: Optional["FieldResponse"] = None
 
     class Config:
         from_attributes = True
@@ -174,6 +174,13 @@ class SubmissionStatus(BaseModel):
 
 
 # Renderer Schemas
+class FieldConditionRule(BaseModel):
+    """Simplified condition rule for frontend evaluation"""
+    source_field_name: str
+    operator: str
+    value: Optional[str] = None
+    action: str  # show, hide, require, enable, disable, skip
+
 class RenderedField(BaseModel):
     id: int
     name: str
@@ -187,6 +194,7 @@ class RenderedField(BaseModel):
     options: Optional[Dict[str, Any]] = None
     validation_rules: Optional[Dict[str, Any]] = None
     current_value: Optional[Union[str, int, float, bool, List[str]]] = None  # If already answered (can be various types)
+    conditions: Optional[List[FieldConditionRule]] = None  # Conditions that affect this field (for frontend evaluation)
 
 
 class RenderedPage(BaseModel):
@@ -225,6 +233,7 @@ class SubmitAnswerResponse(BaseModel):
     message: Optional[str] = None
 
 
-# Resolve forward references for Pydantic v2
+# Rebuild models to resolve forward references
 FieldConditionResponse.model_rebuild()
+
 

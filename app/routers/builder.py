@@ -148,6 +148,15 @@ def get_field_conditions(field_id: int, db: Session = Depends(get_db)):
     return FormBuilderService.get_field_conditions(db, field_id)
 
 
+@router.put("/field-conditions/{condition_id}", response_model=FieldConditionResponse)
+def update_field_condition(condition_id: int, condition_data: FieldConditionCreate, db: Session = Depends(get_db)):
+    """Update a field condition"""
+    condition = FormBuilderService.update_field_condition(db, condition_id, condition_data)
+    if not condition:
+        raise HTTPException(status_code=404, detail="Field condition not found")
+    return condition
+
+
 @router.delete("/field-conditions/{condition_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_field_condition(condition_id: int, db: Session = Depends(get_db)):
     """Delete a field condition"""

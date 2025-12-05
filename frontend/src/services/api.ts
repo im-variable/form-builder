@@ -28,6 +28,13 @@ export interface Page {
   is_first: boolean
 }
 
+export interface FieldConditionRule {
+  source_field_name: string
+  operator: string
+  value?: string
+  action: string
+}
+
 export interface Field {
   id: number
   name: string
@@ -42,6 +49,7 @@ export interface Field {
   options?: Record<string, any>
   validation_rules?: Record<string, any>
   current_value?: string
+  conditions?: FieldConditionRule[]  // Conditions for frontend evaluation
 }
 
 export interface RenderedPage {
@@ -259,6 +267,17 @@ export const builderAPI = {
 
   getFieldConditions: async (fieldId: number): Promise<any[]> => {
     const response = await api.get(`/builder/fields/${fieldId}/conditions`)
+    return response.data
+  },
+
+  updateFieldCondition: async (conditionId: number, data: {
+    source_field_id: number
+    target_field_id: number
+    operator: string
+    value?: string
+    action: string
+  }): Promise<any> => {
+    const response = await api.put(`/builder/field-conditions/${conditionId}`, data)
     return response.data
   },
 

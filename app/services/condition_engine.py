@@ -86,47 +86,40 @@ class ConditionEngine:
         has_show_conditions = any(c.action.value == "show" for c in conditions)
         has_hide_conditions = any(c.action.value == "hide" for c in conditions)
         
-        # Set default values based on condition types
-        # If conditions exist, they override defaults completely
-        has_require_conditions = any(c.action.value == "require" for c in conditions)
-        has_disable_conditions = any(c.action.value == "disable" for c in conditions)
-        has_enable_conditions = any(c.action.value == "enable" for c in conditions)
-        has_skip_conditions = any(c.action.value == "skip" for c in conditions)
-        
+        # Set default visibility based on condition types
         if has_show_conditions and not has_hide_conditions:
             # Field should be hidden by default, shown only if condition is met
             result = {
                 "show": False,
                 "hide": True,
-                "enable": not has_disable_conditions,  # Enabled unless disable condition exists
-                "disable": has_disable_conditions,
-                "require": has_require_conditions,  # Required if require condition exists
-                "skip": has_skip_conditions
+                "enable": True,
+                "disable": False,
+                "require": False,
+                "skip": False
             }
         else:
             # Default: visible (for hide conditions or no visibility conditions)
             result = {
                 "show": True,
                 "hide": False,
-                "enable": not has_disable_conditions,  # Enabled unless disable condition exists
-                "disable": has_disable_conditions,
-                "require": has_require_conditions,  # Required if require condition exists
-                "skip": has_skip_conditions
+                "enable": True,
+                "disable": False,
+                "require": False,
+                "skip": False
             }
 
         # Evaluate all conditions - if ANY condition is met, apply its action
         for condition in conditions:
             # Get source field value from answers
-            # Source field can be from same page or different page - it's looked up by name
-            # The answers dict contains all answers from all pages
             source_field_name = condition.source_field.name
             field_value = answers.get(source_field_name)
-            
-            # If source field not found in answers, treat as None/empty
-            # This handles cases where source field is on a page not yet visited
-            if field_value is None and source_field_name not in answers:
-                # Source field not answered yet (might be on different page not yet visited)
-                field_value = None
+
+            # Debug logging (temporary)
+            print(f"[DEBUG] Evaluating condition for field {field_id}")
+            print(f"[DEBUG] Source field name: {source_field_name}")
+            print(f"[DEBUG] Field value from answers: {field_value} (type: {type(field_value)})")
+            print(f"[DEBUG] Condition operator: {condition.operator}")
+            print(f"[DEBUG] Condition value: {condition.value}")
 
             # Evaluate condition
             condition_met = ConditionEngine.evaluate_operator(
@@ -134,6 +127,8 @@ class ConditionEngine:
                 field_value,
                 condition.value or ""
             )
+            
+            print(f"[DEBUG] Condition met: {condition_met}")
 
             if condition_met:
                 action = condition.action.value

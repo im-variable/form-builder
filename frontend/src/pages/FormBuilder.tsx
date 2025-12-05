@@ -28,7 +28,7 @@ import {
   Rating,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconEyeOff, IconPin, IconRoute, IconPlayerPlay, IconFilter } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter } from '@tabler/icons-react'
 import { builderAPI, Form, Page, Field } from '../services/api'
 
 const FIELD_TYPES = [
@@ -128,6 +128,7 @@ function FormBuilder() {
   const [fieldConditionsModalOpened, { open: openFieldConditionsModal, close: closeFieldConditionsModal }] = useDisclosure(false)
   const [selectedFieldForConditions, setSelectedFieldForConditions] = useState<Field | null>(null)
   const [fieldConditions, setFieldConditions] = useState<any[]>([])
+  const [editingConditionId, setEditingConditionId] = useState<number | null>(null)
   const [conditionSourcePageId, setConditionSourcePageId] = useState<string>('')
   const [conditionSourceFieldId, setConditionSourceFieldId] = useState<string>('')
   const [conditionOperator, setConditionOperator] = useState<string>('equals')
@@ -450,6 +451,14 @@ function FormBuilder() {
   // Field conditions handlers
   const handleOpenFieldConditions = async (field: Field) => {
     setSelectedFieldForConditions(field)
+    setEditingConditionId(null)
+    // Reset form
+    setConditionSourcePageId('')
+    setConditionSourceFieldId('')
+    setConditionOperator('equals')
+    setConditionValue('')
+    setConditionAction('show')
+    setSourcePageFields([])
     try {
       setLoading(true)
       const conditions = await builderAPI.getFieldConditions(field.id)
@@ -462,12 +471,68 @@ function FormBuilder() {
     }
   }
 
-  const handleConditionSourcePageChange = async (pageId: string) => {
-    setConditionSourcePageId(pageId)
-    setConditionSourceFieldId('') // Reset field selection
-    if (pageId && currentForm) {
+  const handleEditFieldCondition = async (condition: any) => {
+    setEditingConditionId(condition.id)
+    
+    // Find the source field's page
+    const sourceField = condition.source_field
+    if (!sourceField) {
+      setError('Source field not found')
+      return
+    }
+    
+    // Find which page contains the source field by loading all pages and checking their fields
+    let sourcePage = null
+    if (currentForm) {
       try {
-        const pageFields = await builderAPI.getFields(parseInt(pageId))
+        const allPages = await builderAPI.getPages(currentForm.id)
+        for (const page of allPages) {
+          const pageFields = await builderAPI.getFields(page.id)
+          if (pageFields.some(f => f.id === sourceField.id)) {
+            sourcePage = page
+            break
+          }
+        }
+      } catch (err: any) {
+        console.error('Error loading pages:', err)
+      }
+    }
+    
+    if (sourcePage) {
+      setConditionSourcePageId(sourcePage.id.toString())
+      // Load fields for the source page
+      try {
+        const pageFields = await builderAPI.getFields(sourcePage.id)
+        setSourcePageFields(pageFields)
+        setConditionSourceFieldId(sourceField.id.toString())
+        setConditionOperator(condition.operator)
+        setConditionValue(condition.value || '')
+        setConditionAction(condition.action)
+      } catch (err: any) {
+        setError(err.response?.data?.detail || 'Failed to load source page fields')
+      }
+    } else {
+      setError('Source page not found')
+    }
+  }
+
+  const handleCancelEditCondition = () => {
+    setEditingConditionId(null)
+    setConditionSourcePageId('')
+    setConditionSourceFieldId('')
+    setConditionOperator('equals')
+    setConditionValue('')
+    setConditionAction('show')
+    setSourcePageFields([])
+  }
+
+  const handleConditionSourcePageChange = async (pageId: string | null) => {
+    const pageIdStr = pageId || ''
+    setConditionSourcePageId(pageIdStr)
+    setConditionSourceFieldId('') // Reset field selection
+    if (pageIdStr && currentForm) {
+      try {
+        const pageFields = await builderAPI.getFields(parseInt(pageIdStr))
         setSourcePageFields(pageFields)
       } catch (err: any) {
         console.error('Error loading fields for page:', err)
@@ -479,35 +544,52 @@ function FormBuilder() {
   }
 
   const handleCreateFieldCondition = async () => {
-    if (!selectedFieldForConditions || !conditionSourceFieldId || !conditionAction) {
+    if (!selectedFieldForConditions || !conditionOperator || !conditionSourceFieldId || !conditionAction) {
       setError('Please fill in all required fields')
+      return
+    }
+
+    // Validate value is provided for operators that need it
+    if (conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty' && !conditionValue) {
+      setError('Please provide a value for this operator')
       return
     }
 
     try {
       setLoading(true)
       setError(null)
-      await builderAPI.createFieldCondition({
-        source_field_id: parseInt(conditionSourceFieldId),
-        target_field_id: selectedFieldForConditions.id,
-        operator: conditionOperator,
-        value: conditionValue || undefined,
-        action: conditionAction,
-      })
+      // source_field_id is the OTHER field (conditionSourceFieldId) - the field that triggers the condition
+      // target_field_id is THIS field (selectedFieldForConditions) - the field being configured that will be affected
+      // Flow: "If {source_field} {operator} {value} → {action} {target_field (this field)}"
+      
+      if (editingConditionId) {
+        // Update existing condition
+        await builderAPI.updateFieldCondition(editingConditionId, {
+          source_field_id: parseInt(conditionSourceFieldId),
+          target_field_id: selectedFieldForConditions.id,
+          operator: conditionOperator,
+          value: conditionValue || undefined,
+          action: conditionAction,
+        })
+      } else {
+        // Create new condition
+        await builderAPI.createFieldCondition({
+          source_field_id: parseInt(conditionSourceFieldId),
+          target_field_id: selectedFieldForConditions.id,
+          operator: conditionOperator,
+          value: conditionValue || undefined,
+          action: conditionAction,
+        })
+      }
       
       // Reload conditions
       const conditions = await builderAPI.getFieldConditions(selectedFieldForConditions.id)
       setFieldConditions(conditions)
       
       // Reset form
-      setConditionSourcePageId('')
-      setConditionSourceFieldId('')
-      setConditionOperator('equals')
-      setConditionValue('')
-      setConditionAction('show')
-      setSourcePageFields([])
+      handleCancelEditCondition()
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create field condition')
+      setError(err.response?.data?.detail || `Failed to ${editingConditionId ? 'update' : 'create'} field condition`)
     } finally {
       setLoading(false)
     }
@@ -582,7 +664,7 @@ function FormBuilder() {
     setFieldPlaceholder(field.placeholder || '')
     setFieldHelpText(field.help_text || '')
     setFieldRequired(field.is_required)
-    setFieldVisible(field.is_visible)
+    setFieldVisible(field.is_visible !== undefined ? field.is_visible : true)
 
     // Parse options for select/radio/checkbox
     if (field.options?.choices) {
@@ -1130,115 +1212,108 @@ function FormBuilder() {
                       ) : (
                         <ScrollArea h={600}>
                           <Stack gap="xs">
-                            {fields.map((field, index) => {
-                              // Check if field is invisible
-                              const isInvisible = !field.is_visible
-                              
-                              return (
-                                <Paper 
-                                  key={field.id} 
-                                  p="sm" 
-                                  withBorder
-                                  style={{ 
-                                    borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
-                                    borderWidth: editingFieldId === field.id ? 2 : undefined,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
-                                    e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-indigo-4)'
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent'
-                                    e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-gray-4)'
-                                  }}
-                                  onClick={() => handleEditField(field)}
-                                >
-                                  <Group gap="xs" wrap="nowrap">
-                                    <Stack gap={2}>
-                                      <ActionIcon
-                                        color="gray"
-                                        variant="light"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleMoveField(field.id, 'up')
-                                        }}
-                                        disabled={index === 0 || loading}
-                                        size="xs"
-                                      >
-                                        <IconArrowUp size={12} />
-                                      </ActionIcon>
-                                      <ActionIcon
-                                        color="gray"
-                                        variant="light"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleMoveField(field.id, 'down')
-                                        }}
-                                        disabled={index === fields.length - 1 || loading}
-                                        size="xs"
-                                      >
-                                        <IconArrowDown size={12} />
-                                      </ActionIcon>
-                                    </Stack>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <Text fw={500} size="sm" truncate>
-                                        {field.label}
-                                      </Text>
-                                      <Group gap={4} mt={4}>
-                                        <Badge variant="light" size="xs">{field.field_type}</Badge>
-                                        {field.is_required && (
-                                          <Badge color="red" variant="light" size="xs">Required</Badge>
-                                        )}
-                                        {isInvisible && (
-                                          <Badge color="gray" variant="light" size="xs">Hidden</Badge>
-                                        )}
-                                      </Group>
-                                    </div>
-                                    <Group gap={2}>
-                                      <ActionIcon
-                                        color="orange"
-                                        variant="light"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleOpenFieldConditions(field)
-                                        }}
-                                        disabled={loading}
-                                        size="sm"
-                                        title="Configure Field Conditions"
-                                      >
-                                        <IconFilter size={14} />
-                                      </ActionIcon>
-                                      <ActionIcon
-                                        color="blue"
-                                        variant="light"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleEditField(field)
-                                        }}
-                                        disabled={editingFieldId === field.id}
-                                        size="sm"
-                                      >
-                                        <IconEdit size={14} />
-                                      </ActionIcon>
-                                      <ActionIcon
-                                        color="red"
-                                        variant="light"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDeleteField(field)
-                                        }}
-                                        disabled={loading}
-                                        size="sm"
-                                      >
-                                        <IconTrash size={14} />
-                                      </ActionIcon>
+                            {fields.map((field, index) => (
+                              <Paper 
+                                key={field.id} 
+                                p="sm" 
+                                withBorder
+                                style={{ 
+                                  borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
+                                  borderWidth: editingFieldId === field.id ? 2 : undefined,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
+                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-indigo-4)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent'
+                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-gray-4)'
+                                }}
+                                onClick={() => handleEditField(field)}
+                              >
+                                <Group gap="xs" wrap="nowrap">
+                                  <Stack gap={2}>
+                                    <ActionIcon
+                                      color="gray"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleMoveField(field.id, 'up')
+                                      }}
+                                      disabled={index === 0 || loading}
+                                      size="xs"
+                                    >
+                                      <IconArrowUp size={12} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      color="gray"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleMoveField(field.id, 'down')
+                                      }}
+                                      disabled={index === fields.length - 1 || loading}
+                                      size="xs"
+                                    >
+                                      <IconArrowDown size={12} />
+                                    </ActionIcon>
+                                  </Stack>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <Text fw={500} size="sm" truncate>{field.label}</Text>
+                                    <Group gap={4} mt={4}>
+                                      <Badge variant="light" size="xs">{field.field_type}</Badge>
+                                      {field.is_required && (
+                                        <Badge color="red" variant="light" size="xs">Required</Badge>
+                                      )}
+                                      {!field.is_visible && (
+                                        <Badge color="gray" variant="light" size="xs">Hidden</Badge>
+                                      )}
                                     </Group>
+                                  </div>
+                                  <Group gap={2}>
+                                    <ActionIcon
+                                      color="orange"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleOpenFieldConditions(field)
+                                      }}
+                                      disabled={loading}
+                                      size="sm"
+                                      title="Configure Field Conditions"
+                                    >
+                                      <IconFilter size={14} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      color="blue"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleEditField(field)
+                                      }}
+                                      disabled={editingFieldId === field.id}
+                                      size="sm"
+                                    >
+                                      <IconEdit size={14} />
+                                    </ActionIcon>
+                                    <ActionIcon
+                                      color="red"
+                                      variant="light"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteField(field)
+                                      }}
+                                      disabled={loading}
+                                      size="sm"
+                                    >
+                                      <IconTrash size={14} />
+                                    </ActionIcon>
                                   </Group>
-                                </Paper>
-                              )
-                            })}
+                                </Group>
+                              </Paper>
+                            ))}
                           </Stack>
                         </ScrollArea>
                       )}
@@ -1398,27 +1473,21 @@ function FormBuilder() {
                   </Paper>
                 )}
 
-                    <Group>
-                      <Checkbox
-                        label="Required field"
-                        checked={fieldRequired}
-                        onChange={(e) => setFieldRequired(e.currentTarget.checked)}
-                        disabled={!currentPage}
-                        size="sm"
-                      />
-                      <Checkbox
-                        label="Visible by default"
-                        checked={fieldVisible}
-                        onChange={(e) => setFieldVisible(e.currentTarget.checked)}
-                        disabled={!currentPage}
-                        size="sm"
-                      />
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      {fieldVisible 
-                        ? "Field will be visible by default. Use 'Show' conditions to hide it initially."
-                        : "Field will be hidden by default. Use 'Show' conditions to make it visible when conditions are met."}
-                    </Text>
+                    <Checkbox
+                      label="Required field"
+                      checked={fieldRequired}
+                      onChange={(e) => setFieldRequired(e.currentTarget.checked)}
+                      disabled={!currentPage}
+                      size="sm"
+                    />
+
+                    <Checkbox
+                      label="Visible by default"
+                      checked={fieldVisible}
+                      onChange={(e) => setFieldVisible(e.currentTarget.checked)}
+                      disabled={!currentPage}
+                      size="sm"
+                    />
 
                     <Group>
                       <Button
@@ -1842,7 +1911,7 @@ function FormBuilder() {
           {selectedFieldForConditions && (
             <Stack gap="md">
               <Text size="sm" c="dimmed">
-                Configure conditions for this field. The field will be shown, hidden, enabled, disabled, required, or skipped based on the value of another field.
+                When <strong>{selectedFieldForConditions.label}</strong> meets a condition, apply an action to another field.
               </Text>
               <Divider />
               
@@ -1855,7 +1924,7 @@ function FormBuilder() {
                       <Group justify="space-between">
                         <div style={{ flex: 1 }}>
                           <Text size="sm">
-                            <strong>{condition.source_field?.label || 'Unknown Field'}</strong>{' '}
+                            If <strong>{condition.source_field?.label || 'Unknown Field'}</strong> {' '}
                             {condition.operator === 'equals' && 'equals'}
                             {condition.operator === 'not_equals' && 'does not equal'}
                             {condition.operator === 'contains' && 'contains'}
@@ -1875,18 +1944,32 @@ function FormBuilder() {
                               {condition.action === 'require' && 'Require'}
                               {condition.action === 'skip' && 'Skip'}
                             </strong>
-                            {' this field'}
+                            {' '}
+                            <strong>this field</strong>
                           </Text>
                         </div>
-                        <ActionIcon
-                          color="red"
-                          variant="light"
-                          onClick={() => handleDeleteFieldCondition(condition.id)}
-                          disabled={loading}
-                          size="sm"
-                        >
-                          <IconTrash size={14} />
-                        </ActionIcon>
+                        <Group gap={4}>
+                          <ActionIcon
+                            color="blue"
+                            variant="light"
+                            onClick={() => handleEditFieldCondition(condition)}
+                            disabled={loading}
+                            size="sm"
+                            title="Edit condition"
+                          >
+                            <IconEdit size={14} />
+                          </ActionIcon>
+                          <ActionIcon
+                            color="red"
+                            variant="light"
+                            onClick={() => handleDeleteFieldCondition(condition.id)}
+                            disabled={loading}
+                            size="sm"
+                            title="Delete condition"
+                          >
+                            <IconTrash size={14} />
+                          </ActionIcon>
+                        </Group>
                       </Group>
                     </Paper>
                   ))}
@@ -1894,12 +1977,16 @@ function FormBuilder() {
                 </Stack>
               )}
 
-              {/* Add New Condition */}
-              <Title order={4}>Add New Condition</Title>
+              {/* Add/Edit Condition */}
+              <Title order={4}>{editingConditionId ? 'Edit Condition' : 'Add New Condition'}</Title>
               <Stack gap="sm">
+                <Alert icon={<IconAlertCircle size={16} />} color="blue">
+                  If another field meets the condition below, apply the action to <strong>{selectedFieldForConditions.label}</strong>.
+                </Alert>
+
                 <Select
                   label="Source Page"
-                  description="Select the page containing the field to watch"
+                  description="Select the page containing the field that triggers the condition"
                   placeholder="Select page"
                   value={conditionSourcePageId}
                   onChange={handleConditionSourcePageChange}
@@ -1911,7 +1998,7 @@ function FormBuilder() {
                 {conditionSourcePageId && sourcePageFields.length > 0 && (
                   <Select
                     label="Source Field"
-                    description="Field whose value will trigger this condition"
+                    description="Field that triggers the condition"
                     placeholder="Select field"
                     value={conditionSourceFieldId}
                     onChange={(val) => setConditionSourceFieldId(val || '')}
@@ -1924,71 +2011,87 @@ function FormBuilder() {
                 )}
 
                 {conditionSourcePageId && sourcePageFields.length === 0 && (
-                  <Alert icon={<IconAlertCircle size={16} />} color="yellow" size="sm">
+                  <Alert icon={<IconAlertCircle size={16} />} color="yellow">
                     No fields available on this page. Please add fields to the selected page first.
                   </Alert>
                 )}
 
-                {conditionSourcePageId && (
-                  <Select
-                    label="Operator"
-                    value={conditionOperator}
-                    onChange={(val) => setConditionOperator(val || 'equals')}
-                    data={[
-                      { value: 'equals', label: 'Equals' },
-                      { value: 'not_equals', label: 'Not Equals' },
-                      { value: 'contains', label: 'Contains' },
-                      { value: 'not_contains', label: 'Not Contains' },
-                      { value: 'greater_than', label: 'Greater Than' },
-                      { value: 'less_than', label: 'Less Than' },
-                      { value: 'is_empty', label: 'Is Empty' },
-                      { value: 'is_not_empty', label: 'Is Not Empty' },
-                    ]}
-                    required
-                    size="sm"
-                  />
+                {conditionSourceFieldId && (
+                  <>
+                    <Select
+                      label="Condition Operator"
+                      description="How to compare the source field"
+                      value={conditionOperator}
+                      onChange={(val) => setConditionOperator(val || 'equals')}
+                      data={[
+                        { value: 'equals', label: 'Equals' },
+                        { value: 'not_equals', label: 'Not Equals' },
+                        { value: 'contains', label: 'Contains' },
+                        { value: 'not_contains', label: 'Not Contains' },
+                        { value: 'greater_than', label: 'Greater Than' },
+                        { value: 'less_than', label: 'Less Than' },
+                        { value: 'is_empty', label: 'Is Empty' },
+                        { value: 'is_not_empty', label: 'Is Not Empty' },
+                      ]}
+                      required
+                      size="sm"
+                    />
+
+                    {conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty' && (
+                      <TextInput
+                        label="Condition Value"
+                        description="Value to compare the source field against"
+                        placeholder="Enter value to compare"
+                        value={conditionValue}
+                        onChange={(e) => setConditionValue(e.currentTarget.value)}
+                        required={conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty'}
+                        size="sm"
+                      />
+                    )}
+                  </>
                 )}
 
-                {conditionSourcePageId && conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty' && (
-                  <TextInput
-                    label="Value"
-                    placeholder="Enter value to compare"
-                    value={conditionValue}
-                    onChange={(e) => setConditionValue(e.currentTarget.value)}
-                    required={conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty'}
-                    size="sm"
-                  />
-                )}
-
-                {conditionSourcePageId && (
+                {conditionSourceFieldId && conditionOperator && (
                   <Select
                     label="Action"
-                    description="What to do when condition is met"
+                    description={`What to do to ${selectedFieldForConditions.label} when condition is met`}
                     value={conditionAction}
                     onChange={(val) => setConditionAction(val || 'show')}
                     data={[
-                      { value: 'show', label: 'Show Field' },
-                      { value: 'hide', label: 'Hide Field' },
-                      { value: 'enable', label: 'Enable Field' },
-                      { value: 'disable', label: 'Disable Field' },
-                      { value: 'require', label: 'Require Field' },
-                      { value: 'skip', label: 'Skip Field' },
+                      { value: 'show', label: 'Show this field' },
+                      { value: 'hide', label: 'Hide this field' },
+                      { value: 'enable', label: 'Enable this field' },
+                      { value: 'disable', label: 'Disable this field' },
+                      { value: 'require', label: 'Require this field' },
+                      { value: 'skip', label: 'Skip this field' },
                     ]}
                     required
                     size="sm"
                   />
                 )}
 
-                <Button
-                  onClick={handleCreateFieldCondition}
-                  disabled={!conditionSourcePageId || !conditionSourceFieldId || !conditionAction || loading}
-                  leftSection={<IconPlus size={16} />}
-                  variant="gradient"
-                  gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
-                  size="sm"
-                >
-                  Add Condition
-                </Button>
+                <Group>
+                  <Button
+                    onClick={handleCreateFieldCondition}
+                    disabled={!conditionSourcePageId || !conditionSourceFieldId || !conditionOperator || (!conditionValue && conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty') || !conditionAction || loading}
+                    leftSection={editingConditionId ? <IconCheck size={16} /> : <IconPlus size={16} />}
+                    variant="gradient"
+                    gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                    size="sm"
+                  >
+                    {editingConditionId ? 'Update Condition' : 'Add Condition'}
+                  </Button>
+                  {editingConditionId && (
+                    <Button
+                      variant="light"
+                      onClick={handleCancelEditCondition}
+                      disabled={loading}
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </Group>
               </Stack>
             </Stack>
           )}

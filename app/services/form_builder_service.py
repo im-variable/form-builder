@@ -213,13 +213,29 @@ class FormBuilderService:
 
     @staticmethod
     def get_field_conditions(db: Session, field_id: int) -> List[FieldCondition]:
-        """Get all conditions for a field"""
+        """Get all conditions for a field (where field is the target - conditions that affect this field)"""
         from sqlalchemy.orm import joinedload
         return db.query(FieldCondition).options(
-            joinedload(FieldCondition.source_field)
+            joinedload(FieldCondition.source_field),
+            joinedload(FieldCondition.target_field)
         ).filter(
             FieldCondition.target_field_id == field_id
         ).all()
+
+    @staticmethod
+    def update_field_condition(db: Session, condition_id: int, condition_data: FieldConditionCreate) -> Optional[FieldCondition]:
+        """Update a field condition"""
+        condition = db.query(FieldCondition).filter(FieldCondition.id == condition_id).first()
+        if not condition:
+            return None
+        
+        # Update condition fields
+        for key, value in condition_data.dict().items():
+            setattr(condition, key, value)
+        
+        db.commit()
+        db.refresh(condition)
+        return condition
 
     @staticmethod
     def delete_field_condition(db: Session, condition_id: int) -> bool:
