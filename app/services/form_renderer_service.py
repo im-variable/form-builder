@@ -126,19 +126,60 @@ class FormRendererService:
             joinedload(Field.conditions).joinedload(FieldCondition.source_field)
         ).filter(Field.page_id == current_page.id).order_by(Field.order).all()
         
+        # Build answers dict for condition evaluation, including default values
+        # This ensures conditions work correctly on initial form load
+        condition_evaluation_answers = current_answers.copy() if current_answers else {}
+        
+        # Add default values for fields that don't have answers yet
+        # This allows conditions to evaluate based on default values on initial load
+        all_form_fields = db.query(Field).filter(Field.page_id.in_(
+            db.query(Page.id).filter(Page.form_id == form_id)
+        )).all()
+        
+        for form_field in all_form_fields:
+            # Only add default value if field doesn't already have a value
+            if form_field.name not in condition_evaluation_answers:
+                if form_field.default_value is not None and form_field.default_value != "":
+                    condition_evaluation_answers[form_field.name] = form_field.default_value
+        
         rendered_fields = []
         for field in fields:
-            # Check if field should be visible based on conditions
+            # Evaluate all field conditions (visibility, required, enable/disable, etc.)
             # Conditions can reference fields from:
             # - Same page: Field B shows when Field A equals "yes"
             # - Different pages: Field shows when a field from Page 1 equals "yes"
-            # current_answers contains ALL answers from all pages (merged db_answers + current_answers)
+            # condition_evaluation_answers contains ALL answers from all pages + default values
             conditions = field.conditions
-            is_visible = ConditionEngine.should_field_be_visible(
+            has_conditions = len(conditions) > 0
+            
+            # Check which types of conditions exist
+            has_visibility_conditions = any(c.action.value in ["show", "hide"] for c in conditions)
+            has_require_conditions = any(c.action.value == "require" for c in conditions)
+            
+            if has_conditions:
+                # Evaluate conditions - they override defaults when they exist
+                condition_result = ConditionEngine.evaluate_field_conditions(
                 field.id,
                 conditions,
-                current_answers  # Contains answers from all pages for cross-page condition evaluation
-            )
+                    condition_evaluation_answers  # Contains answers + default values for condition evaluation
+                )
+                
+                # Apply condition results - conditions take priority over defaults
+                # For visibility: use condition result if visibility conditions exist, else use default
+                if has_visibility_conditions:
+                    is_visible = condition_result["show"] and not condition_result["hide"]
+                else:
+                    is_visible = field.is_visible
+                
+                # For required: use condition result if require conditions exist, else use default
+                if has_require_conditions:
+                    is_required = condition_result["require"]
+                else:
+                    is_required = field.is_required
+            else:
+                # No conditions - use default field behavior
+                is_visible = field.is_visible
+                is_required = field.is_required
 
             # Get current value if exists
             current_value = current_answers.get(field.name)
@@ -150,8 +191,8 @@ class FormRendererService:
                 field_type=field.field_type,
                 placeholder=field.placeholder,
                 help_text=field.help_text,
-                is_required=field.is_required,
-                is_visible=is_visible,
+                is_required=is_required,  # Condition-evaluated or default
+                is_visible=is_visible,  # Condition-evaluated or default
                 default_value=field.default_value,
                 options=field.options,
                 validation_rules=field.validation_rules,
@@ -223,21 +264,58 @@ class FormRendererService:
                 next_page_fields = db.query(Field).options(
                     joinedload(Field.conditions).joinedload(FieldCondition.source_field)
                 ).filter(Field.page_id == next_page.id).order_by(Field.order).all()
-                next_rendered_fields = []
                 
+                # Build answers dict for condition evaluation
+                # IMPORTANT: Use db_answers (all saved answers from all pages) merged with current_answers
+                auto_advance_condition_answers = {**(db_answers if db_answers else {}), **(current_answers if current_answers else {})}
+                
+                # Add default values for fields that don't have answers yet
+                all_form_fields_auto = db.query(Field).filter(Field.page_id.in_(
+                    db.query(Page.id).filter(Page.form_id == form_id)
+                )).all()
+                
+                for form_field in all_form_fields_auto:
+                    if form_field.name not in auto_advance_condition_answers:
+                        if form_field.default_value is not None and form_field.default_value != "":
+                            auto_advance_condition_answers[form_field.name] = form_field.default_value
+                
+                next_rendered_fields = []
                 for field in next_page_fields:
-                    # Evaluate field conditions
-                    # Conditions can reference fields from any page (same page or different pages)
-                    # current_answers contains ALL answers from all pages
+                    # Evaluate all field conditions (visibility, required, enable/disable, etc.)
                     conditions = field.conditions
-                    is_visible = ConditionEngine.should_field_be_visible(
-                        field.id, 
-                        conditions, 
-                        current_answers  # Contains answers from all pages for cross-page condition evaluation
-                    )
+                    has_conditions = len(conditions) > 0
+                    
+                    # Check which types of conditions exist
+                    has_visibility_conditions = any(c.action.value in ["show", "hide"] for c in conditions)
+                    has_require_conditions = any(c.action.value == "require" for c in conditions)
+                    
+                    if has_conditions:
+                        # Evaluate conditions - they override defaults when they exist
+                        condition_result = ConditionEngine.evaluate_field_conditions(
+                            field.id,
+                            conditions,
+                            auto_advance_condition_answers  # Contains ALL answers from all pages + default values
+                        )
+                        
+                        # Apply condition results - conditions take priority over defaults
+                        # For visibility: use condition result if visibility conditions exist, else use default
+                        if has_visibility_conditions:
+                            is_visible = condition_result["show"] and not condition_result["hide"]
+                        else:
+                            is_visible = field.is_visible
+                        
+                        # For required: use condition result if require conditions exist, else use default
+                        if has_require_conditions:
+                            is_required = condition_result["require"]
+                        else:
+                            is_required = field.is_required
+                    else:
+                        # No conditions - use default field behavior
+                        is_visible = field.is_visible
+                        is_required = field.is_required
                     
                     # Get current value if exists
-                    current_value = current_answers.get(field.name)
+                    current_value = auto_advance_condition_answers.get(field.name)
                     
                     next_rendered_fields.append(RenderedField(
                         id=field.id,
@@ -246,8 +324,8 @@ class FormRendererService:
                         field_type=field.field_type,
                         placeholder=field.placeholder,
                         help_text=field.help_text,
-                        is_required=field.is_required,
-                        is_visible=is_visible,
+                        is_required=is_required,  # Condition-evaluated or default
+                        is_visible=is_visible,  # Condition-evaluated or default
                         default_value=field.default_value,
                         options=field.options,
                         validation_rules=field.validation_rules,
@@ -339,20 +417,58 @@ class FormRendererService:
                     joinedload(Field.conditions).joinedload(FieldCondition.source_field)
                 ).filter(Field.page_id == next_page.id).order_by(Field.order).all()
                 
+                # Build answers dict for condition evaluation
+                # IMPORTANT: Use db_answers (all saved answers from all pages) merged with current_answers
+                # This ensures conditions on next page can check values from previous pages
+                advance_condition_answers = {**(db_answers if db_answers else {}), **(current_answers if current_answers else {})}
+                
+                # Add default values for fields that don't have answers yet
+                all_form_fields_advance = db.query(Field).filter(Field.page_id.in_(
+                    db.query(Page.id).filter(Page.form_id == form_id)
+                )).all()
+                
+                for form_field in all_form_fields_advance:
+                    if form_field.name not in advance_condition_answers:
+                        if form_field.default_value is not None and form_field.default_value != "":
+                            advance_condition_answers[form_field.name] = form_field.default_value
+                
                 next_rendered_fields = []
                 for field in next_page_fields:
-                    # Check if field should be visible based on conditions
-                    # Conditions can reference fields from any page (same page or different pages)
-                    # current_answers contains ALL answers from all pages
+                    # Evaluate all field conditions (visibility, required, enable/disable, etc.)
                     conditions = field.conditions
-                    is_visible = ConditionEngine.should_field_be_visible(
-                        field.id,
-                        conditions,
-                        current_answers  # Contains answers from all pages for cross-page condition evaluation
-                    )
+                    has_conditions = len(conditions) > 0
+                    
+                    # Check which types of conditions exist
+                    has_visibility_conditions = any(c.action.value in ["show", "hide"] for c in conditions)
+                    has_require_conditions = any(c.action.value == "require" for c in conditions)
+                    
+                    if has_conditions:
+                        # Evaluate conditions - they override defaults when they exist
+                        condition_result = ConditionEngine.evaluate_field_conditions(
+                            field.id,
+                            conditions,
+                            advance_condition_answers  # Contains ALL answers from all pages + default values
+                        )
+                        
+                        # Apply condition results - conditions take priority over defaults
+                        # For visibility: use condition result if visibility conditions exist, else use default
+                        if has_visibility_conditions:
+                            is_visible = condition_result["show"] and not condition_result["hide"]
+                        else:
+                            is_visible = field.is_visible
+                        
+                        # For required: use condition result if require conditions exist, else use default
+                        if has_require_conditions:
+                            is_required = condition_result["require"]
+                        else:
+                            is_required = field.is_required
+                    else:
+                        # No conditions - use default field behavior
+                        is_visible = field.is_visible
+                        is_required = field.is_required
 
                     # Get current value if exists
-                    current_value = current_answers.get(field.name)
+                    current_value = advance_condition_answers.get(field.name)
 
                     next_rendered_fields.append(RenderedField(
                         id=field.id,
@@ -361,8 +477,8 @@ class FormRendererService:
                         field_type=field.field_type,
                         placeholder=field.placeholder,
                         help_text=field.help_text,
-                        is_required=field.is_required,
-                        is_visible=is_visible,
+                        is_required=is_required,  # Condition-evaluated or default
+                        is_visible=is_visible,  # Condition-evaluated or default
                         default_value=field.default_value,
                         options=field.options,
                         validation_rules=field.validation_rules,

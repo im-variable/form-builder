@@ -28,7 +28,7 @@ import {
   Rating,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconEyeOff, IconPin, IconRoute, IconPlayerPlay, IconFilter } from '@tabler/icons-react'
 import { builderAPI, Form, Page, Field } from '../services/api'
 
 const FIELD_TYPES = [
@@ -74,6 +74,7 @@ function FormBuilder() {
   const [fieldPlaceholder, setFieldPlaceholder] = useState('')
   const [fieldHelpText, setFieldHelpText] = useState('')
   const [fieldRequired, setFieldRequired] = useState(false)
+  const [fieldVisible, setFieldVisible] = useState(true)
 
   // Options for select/radio/checkbox
   const [fieldChoices, setFieldChoices] = useState<Array<{ value: string; label: string }>>([])
@@ -581,6 +582,7 @@ function FormBuilder() {
     setFieldPlaceholder(field.placeholder || '')
     setFieldHelpText(field.help_text || '')
     setFieldRequired(field.is_required)
+    setFieldVisible(field.is_visible)
 
     // Parse options for select/radio/checkbox
     if (field.options?.choices) {
@@ -606,6 +608,7 @@ function FormBuilder() {
     setFieldPlaceholder('')
     setFieldHelpText('')
     setFieldRequired(false)
+    setFieldVisible(true)
     setFieldChoices([])
     setNewChoiceValue('')
     setNewChoiceLabel('')
@@ -712,6 +715,7 @@ function FormBuilder() {
           placeholder: fieldPlaceholder || undefined,
           help_text: fieldHelpText || undefined,
           is_required: fieldRequired,
+          is_visible: fieldVisible,
           options: parsedOptions,
         })
 
@@ -728,7 +732,7 @@ function FormBuilder() {
           help_text: fieldHelpText || undefined,
           order: fields.length + 1,
           is_required: fieldRequired,
-          is_visible: true,
+          is_visible: fieldVisible,
           options: parsedOptions,
         })
 
@@ -1126,105 +1130,115 @@ function FormBuilder() {
                       ) : (
                         <ScrollArea h={600}>
                           <Stack gap="xs">
-                            {fields.map((field, index) => (
-                              <Paper 
-                                key={field.id} 
-                                p="sm" 
-                                withBorder
-                                style={{ 
-                                  borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
-                                  borderWidth: editingFieldId === field.id ? 2 : undefined,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
-                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-indigo-4)'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent'
-                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-gray-4)'
-                                }}
-                                onClick={() => handleEditField(field)}
-                              >
-                                <Group gap="xs" wrap="nowrap">
-                                  <Stack gap={2}>
-                                    <ActionIcon
-                                      color="gray"
-                                      variant="light"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleMoveField(field.id, 'up')
-                                      }}
-                                      disabled={index === 0 || loading}
-                                      size="xs"
-                                    >
-                                      <IconArrowUp size={12} />
-                                    </ActionIcon>
-                                    <ActionIcon
-                                      color="gray"
-                                      variant="light"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleMoveField(field.id, 'down')
-                                      }}
-                                      disabled={index === fields.length - 1 || loading}
-                                      size="xs"
-                                    >
-                                      <IconArrowDown size={12} />
-                                    </ActionIcon>
-                                  </Stack>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <Text fw={500} size="sm" truncate>{field.label}</Text>
-                                    <Group gap={4} mt={4}>
-                                      <Badge variant="light" size="xs">{field.field_type}</Badge>
-                                      {field.is_required && (
-                                        <Badge color="red" variant="light" size="xs">Required</Badge>
-                                      )}
+                            {fields.map((field, index) => {
+                              // Check if field is invisible
+                              const isInvisible = !field.is_visible
+                              
+                              return (
+                                <Paper 
+                                  key={field.id} 
+                                  p="sm" 
+                                  withBorder
+                                  style={{ 
+                                    borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
+                                    borderWidth: editingFieldId === field.id ? 2 : undefined,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
+                                    e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-indigo-4)'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                    e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-gray-4)'
+                                  }}
+                                  onClick={() => handleEditField(field)}
+                                >
+                                  <Group gap="xs" wrap="nowrap">
+                                    <Stack gap={2}>
+                                      <ActionIcon
+                                        color="gray"
+                                        variant="light"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleMoveField(field.id, 'up')
+                                        }}
+                                        disabled={index === 0 || loading}
+                                        size="xs"
+                                      >
+                                        <IconArrowUp size={12} />
+                                      </ActionIcon>
+                                      <ActionIcon
+                                        color="gray"
+                                        variant="light"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleMoveField(field.id, 'down')
+                                        }}
+                                        disabled={index === fields.length - 1 || loading}
+                                        size="xs"
+                                      >
+                                        <IconArrowDown size={12} />
+                                      </ActionIcon>
+                                    </Stack>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <Text fw={500} size="sm" truncate>
+                                        {field.label}
+                                      </Text>
+                                      <Group gap={4} mt={4}>
+                                        <Badge variant="light" size="xs">{field.field_type}</Badge>
+                                        {field.is_required && (
+                                          <Badge color="red" variant="light" size="xs">Required</Badge>
+                                        )}
+                                        {isInvisible && (
+                                          <Badge color="gray" variant="light" size="xs">Hidden</Badge>
+                                        )}
+                                      </Group>
+                                    </div>
+                                    <Group gap={2}>
+                                      <ActionIcon
+                                        color="orange"
+                                        variant="light"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleOpenFieldConditions(field)
+                                        }}
+                                        disabled={loading}
+                                        size="sm"
+                                        title="Configure Field Conditions"
+                                      >
+                                        <IconFilter size={14} />
+                                      </ActionIcon>
+                                      <ActionIcon
+                                        color="blue"
+                                        variant="light"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleEditField(field)
+                                        }}
+                                        disabled={editingFieldId === field.id}
+                                        size="sm"
+                                      >
+                                        <IconEdit size={14} />
+                                      </ActionIcon>
+                                      <ActionIcon
+                                        color="red"
+                                        variant="light"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDeleteField(field)
+                                        }}
+                                        disabled={loading}
+                                        size="sm"
+                                      >
+                                        <IconTrash size={14} />
+                                      </ActionIcon>
                                     </Group>
-                                  </div>
-                                  <Group gap={2}>
-                                    <ActionIcon
-                                      color="orange"
-                                      variant="light"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleOpenFieldConditions(field)
-                                      }}
-                                      disabled={loading}
-                                      size="sm"
-                                      title="Configure Field Conditions"
-                                    >
-                                      <IconFilter size={14} />
-                                    </ActionIcon>
-                                    <ActionIcon
-                                      color="blue"
-                                      variant="light"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleEditField(field)
-                                      }}
-                                      disabled={editingFieldId === field.id}
-                                      size="sm"
-                                    >
-                                      <IconEdit size={14} />
-                                    </ActionIcon>
-                                    <ActionIcon
-                                      color="red"
-                                      variant="light"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleDeleteField(field)
-                                      }}
-                                      disabled={loading}
-                                      size="sm"
-                                    >
-                                      <IconTrash size={14} />
-                                    </ActionIcon>
                                   </Group>
-                                </Group>
-                              </Paper>
-                            ))}
+                                </Paper>
+                              )
+                            })}
                           </Stack>
                         </ScrollArea>
                       )}
@@ -1384,13 +1398,27 @@ function FormBuilder() {
                   </Paper>
                 )}
 
-                    <Checkbox
-                      label="Required field"
-                      checked={fieldRequired}
-                      onChange={(e) => setFieldRequired(e.currentTarget.checked)}
-                      disabled={!currentPage}
-                      size="sm"
-                    />
+                    <Group>
+                      <Checkbox
+                        label="Required field"
+                        checked={fieldRequired}
+                        onChange={(e) => setFieldRequired(e.currentTarget.checked)}
+                        disabled={!currentPage}
+                        size="sm"
+                      />
+                      <Checkbox
+                        label="Visible by default"
+                        checked={fieldVisible}
+                        onChange={(e) => setFieldVisible(e.currentTarget.checked)}
+                        disabled={!currentPage}
+                        size="sm"
+                      />
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {fieldVisible 
+                        ? "Field will be visible by default. Use 'Show' conditions to hide it initially."
+                        : "Field will be hidden by default. Use 'Show' conditions to make it visible when conditions are met."}
+                    </Text>
 
                     <Group>
                       <Button

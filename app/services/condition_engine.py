@@ -86,26 +86,32 @@ class ConditionEngine:
         has_show_conditions = any(c.action.value == "show" for c in conditions)
         has_hide_conditions = any(c.action.value == "hide" for c in conditions)
         
-        # Set default visibility based on condition types
+        # Set default values based on condition types
+        # If conditions exist, they override defaults completely
+        has_require_conditions = any(c.action.value == "require" for c in conditions)
+        has_disable_conditions = any(c.action.value == "disable" for c in conditions)
+        has_enable_conditions = any(c.action.value == "enable" for c in conditions)
+        has_skip_conditions = any(c.action.value == "skip" for c in conditions)
+        
         if has_show_conditions and not has_hide_conditions:
             # Field should be hidden by default, shown only if condition is met
             result = {
                 "show": False,
                 "hide": True,
-                "enable": True,
-                "disable": False,
-                "require": False,
-                "skip": False
+                "enable": not has_disable_conditions,  # Enabled unless disable condition exists
+                "disable": has_disable_conditions,
+                "require": has_require_conditions,  # Required if require condition exists
+                "skip": has_skip_conditions
             }
         else:
             # Default: visible (for hide conditions or no visibility conditions)
             result = {
                 "show": True,
                 "hide": False,
-                "enable": True,
-                "disable": False,
-                "require": False,
-                "skip": False
+                "enable": not has_disable_conditions,  # Enabled unless disable condition exists
+                "disable": has_disable_conditions,
+                "require": has_require_conditions,  # Required if require condition exists
+                "skip": has_skip_conditions
             }
 
         # Evaluate all conditions - if ANY condition is met, apply its action
