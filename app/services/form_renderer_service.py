@@ -69,17 +69,21 @@ class FormRendererService:
                 db.commit()
                 db.refresh(submission)
 
-        # Get current answers from database
+        # Get current answers from database (includes answers from ALL pages)
         db_answers = FormRendererService.get_current_answers(db, session_id)
         
         # Merge answers: prioritize current_answers (from frontend) for real-time condition evaluation
         # but use db_answers as base to include all previously saved answers from other pages
+        # This ensures field conditions can reference fields from:
+        # - Same page (e.g., Field B shows when Field A equals "yes")
+        # - Different pages (e.g., Field on Page 2 shows when Field on Page 1 equals "yes")
         if current_answers and isinstance(current_answers, dict) and len(current_answers) > 0:
-            # Merge: db_answers as base (includes all saved answers), then override with current_answers (current page edits)
+            # Merge: db_answers as base (includes all saved answers from all pages), 
+            # then override with current_answers (current page edits for real-time evaluation)
             merged_answers = {**(db_answers if db_answers else {}), **current_answers}
             current_answers = merged_answers
         elif db_answers:
-            # Use database answers if no current_answers passed
+            # Use database answers if no current_answers passed (includes all pages)
             current_answers = db_answers
         else:
             # Fallback to empty dict
@@ -124,12 +128,16 @@ class FormRendererService:
         
         rendered_fields = []
         for field in fields:
-            # Check if field should be visible
+            # Check if field should be visible based on conditions
+            # Conditions can reference fields from:
+            # - Same page: Field B shows when Field A equals "yes"
+            # - Different pages: Field shows when a field from Page 1 equals "yes"
+            # current_answers contains ALL answers from all pages (merged db_answers + current_answers)
             conditions = field.conditions
             is_visible = ConditionEngine.should_field_be_visible(
                 field.id,
                 conditions,
-                current_answers
+                current_answers  # Contains answers from all pages for cross-page condition evaluation
             )
 
             # Get current value if exists
@@ -212,13 +220,21 @@ class FormRendererService:
             
             if next_page:
                 # Render fields for the next page
-                next_page_fields = db.query(Field).filter(Field.page_id == next_page.id).order_by(Field.order).all()
+                next_page_fields = db.query(Field).options(
+                    joinedload(Field.conditions).joinedload(FieldCondition.source_field)
+                ).filter(Field.page_id == next_page.id).order_by(Field.order).all()
                 next_rendered_fields = []
                 
                 for field in next_page_fields:
                     # Evaluate field conditions
-                    field_conditions = db.query(FieldCondition).filter(FieldCondition.target_field_id == field.id).all()
-                    is_visible = ConditionEngine.should_field_be_visible(field.id, field_conditions, current_answers)
+                    # Conditions can reference fields from any page (same page or different pages)
+                    # current_answers contains ALL answers from all pages
+                    conditions = field.conditions
+                    is_visible = ConditionEngine.should_field_be_visible(
+                        field.id, 
+                        conditions, 
+                        current_answers  # Contains answers from all pages for cross-page condition evaluation
+                    )
                     
                     # Get current value if exists
                     current_value = current_answers.get(field.name)
@@ -325,12 +341,14 @@ class FormRendererService:
                 
                 next_rendered_fields = []
                 for field in next_page_fields:
-                    # Check if field should be visible
+                    # Check if field should be visible based on conditions
+                    # Conditions can reference fields from any page (same page or different pages)
+                    # current_answers contains ALL answers from all pages
                     conditions = field.conditions
                     is_visible = ConditionEngine.should_field_be_visible(
                         field.id,
                         conditions,
-                        current_answers
+                        current_answers  # Contains answers from all pages for cross-page condition evaluation
                     )
 
                     # Get current value if exists

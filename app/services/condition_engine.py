@@ -111,8 +111,16 @@ class ConditionEngine:
         # Evaluate all conditions - if ANY condition is met, apply its action
         for condition in conditions:
             # Get source field value from answers
+            # Source field can be from same page or different page - it's looked up by name
+            # The answers dict contains all answers from all pages
             source_field_name = condition.source_field.name
             field_value = answers.get(source_field_name)
+            
+            # If source field not found in answers, treat as None/empty
+            # This handles cases where source field is on a page not yet visited
+            if field_value is None and source_field_name not in answers:
+                # Source field not answered yet (might be on different page not yet visited)
+                field_value = None
 
             # Evaluate condition
             condition_met = ConditionEngine.evaluate_operator(

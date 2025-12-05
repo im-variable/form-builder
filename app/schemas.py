@@ -113,6 +113,7 @@ class FieldConditionCreate(FieldConditionBase):
 
 class FieldConditionResponse(FieldConditionBase):
     id: int
+    source_field: Optional["FieldResponse"] = None  # Include source field data for display
 
     class Config:
         from_attributes = True
@@ -223,4 +224,7 @@ class SubmitAnswerResponse(BaseModel):
     is_complete: bool = False
     message: Optional[str] = None
 
+
+# Resolve forward references for Pydantic v2
+FieldConditionResponse.model_rebuild()
 
