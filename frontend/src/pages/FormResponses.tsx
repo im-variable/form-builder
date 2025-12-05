@@ -244,16 +244,17 @@ function FormResponses() {
                         <Group gap={4} align="center">
                           <IconClock size={14} style={{ color: 'var(--mantine-color-gray-6)' }} />
                           <Text size="sm" fw={500}>
-                            {new Date(submission.completed_at).toLocaleDateString('en-US', { 
+                            {/* Parse UTC datetime from backend and display in local timezone */}
+                            {new Date(submission.completed_at).toLocaleDateString(undefined, { 
                               month: 'short', 
                               day: 'numeric', 
-                              year: 'numeric' 
+                              year: 'numeric'
                             })}
                           </Text>
                           <Text size="sm" c="dimmed">
-                            at {new Date(submission.completed_at).toLocaleTimeString('en-US', { 
+                            at {new Date(submission.completed_at).toLocaleTimeString(undefined, { 
                               hour: '2-digit', 
-                              minute: '2-digit' 
+                              minute: '2-digit'
                             })}
                           </Text>
                         </Group>

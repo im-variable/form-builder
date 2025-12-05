@@ -153,6 +153,7 @@ class SubmissionService:
                 "id": submission.id,
                 "session_id": submission.session_id,
                 "status": submission.status,
+                # Store in UTC, frontend will convert to local timezone
                 "created_at": submission.created_at.isoformat() if submission.created_at else None,
                 "completed_at": submission.completed_at.isoformat() if submission.completed_at else None,
                 "responses": responses_dict
