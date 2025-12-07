@@ -122,7 +122,8 @@ class SubmissionService:
                 "field_id": field.id,
                 "label": field.label,
                 "value": response.value,
-                "field_type": field.field_type.value
+                "field_type": field.field_type.value,
+                "options": field.options  # Include options for attachments
             }
         
         return result
@@ -146,7 +147,8 @@ class SubmissionService:
                     "field_id": field.id,
                     "label": field.label,
                     "value": response.value,
-                    "field_type": field.field_type.value
+                    "field_type": field.field_type.value,
+                    "options": field.options  # Include options for attachments
                 }
             
             result.append({

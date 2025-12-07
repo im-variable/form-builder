@@ -21,10 +21,11 @@ import {
   Modal,
   Pagination,
   Center,
+  Image,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconAlertCircle, IconFileText, IconCalendar, IconCheck, IconUser, IconClock, IconTrash } from '@tabler/icons-react'
-import { formAPI, builderAPI } from '../services/api'
+import { IconArrowLeft, IconAlertCircle, IconFileText, IconCalendar, IconCheck, IconUser, IconClock, IconTrash, IconPhoto, IconVideo, IconMusic, IconUpload } from '@tabler/icons-react'
+import { formAPI, builderAPI, uploadAPI } from '../services/api'
 
 interface Submission {
   id: number
@@ -37,6 +38,12 @@ interface Submission {
     label: string
     value: string
     field_type: string
+    options?: {
+      attachment?: {
+        type: string
+        url: string
+      }
+    }
   }>
 }
 
@@ -58,6 +65,17 @@ function FormResponses() {
       loadData()
     }
   }, [formId])
+
+  const getFileUrl = (url: string, type?: string) => {
+    if (!url) return null
+    // If value is already a full URL, return it
+    if (url.startsWith('http')) return url
+    // Otherwise, construct the URL from the filename
+    const parts = url.split('/')
+    const filename = parts[parts.length - 1]
+    const fileType = type || 'file'
+    return uploadAPI.getFileUrl(fileType, filename)
+  }
 
   const loadData = async () => {
     try {
@@ -278,48 +296,127 @@ function FormResponses() {
 
                   <Divider />
 
-                  {/* Responses - Chip Format */}
-                  <Group gap="xs" wrap="wrap">
-                    {Object.entries(submission.responses).map(([fieldName, response]) => (
-                      <Group key={fieldName} gap={4} style={{ flexWrap: 'nowrap' }}>
-                        <Text size="xs" fw={600} c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                          {response.label}:
-                        </Text>
-                        {response.value ? (
-                          <Badge
-                            size="md"
-                            variant="filled"
-                            color="indigo"
-                            radius="md"
-                            style={{ 
-                              padding: '4px 10px',
-                              fontSize: '12px',
-                              fontWeight: 500
-                            }}
-                          >
-                            {response.value}
-                          </Badge>
-                        ) : (
-                          <Badge
-                            size="md"
-                            variant="light"
-                            color="gray"
-                            radius="md"
-                            style={{ 
-                              padding: '4px 10px',
-                              fontSize: '12px',
-                              fontStyle: 'italic'
-                            }}
-                          >
-                            No answer
-                          </Badge>
-                        )}
-                        <Badge variant="dot" size="xs" color="blue" radius="md">
-                          {response.field_type}
-                        </Badge>
-                      </Group>
-                    ))}
-                  </Group>
+                  {/* Responses - Enhanced Display with Attachments */}
+                  <Stack gap="sm">
+                    {Object.entries(submission.responses).map(([fieldName, response]) => {
+                      const attachment = response.options?.attachment
+                      const attachmentUrl = attachment ? getFileUrl(attachment.url, attachment.type) : null
+                      const isFileField = response.field_type === 'file'
+                      const fileUrl = isFileField && response.value ? getFileUrl(response.value, 'file') : null
+                      
+                      return (
+                        <Paper key={fieldName} p="sm" withBorder radius="md">
+                          <Stack gap="xs">
+                            <Group gap="xs" align="center">
+                              <Text size="sm" fw={600}>
+                                {response.label}
+                              </Text>
+                              <Badge variant="dot" size="xs" color="blue" radius="md">
+                                {response.field_type}
+                              </Badge>
+                            </Group>
+                            
+                            {/* Show attachment if exists */}
+                            {attachmentUrl && (
+                              <Paper p="xs" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                                <Group gap="xs" mb="xs">
+                                  {attachment.type === 'image' && <IconPhoto size={16} />}
+                                  {attachment.type === 'video' && <IconVideo size={16} />}
+                                  {attachment.type === 'audio' && <IconMusic size={16} />}
+                                  {(attachment.type === 'file' || !attachment.type) && <IconUpload size={16} />}
+                                  <Text size="xs" fw={500}>Field Attachment</Text>
+                                </Group>
+                                {attachment.type === 'image' && (
+                                  <Image
+                                    src={attachmentUrl}
+                                    alt={response.label}
+                                    maw={200}
+                                    mah={150}
+                                    fit="contain"
+                                    style={{ borderRadius: 4 }}
+                                  />
+                                )}
+                                {attachment.type === 'video' && (
+                                  <video
+                                    src={attachmentUrl}
+                                    controls
+                                    style={{ width: '100%', maxWidth: 300, borderRadius: 4 }}
+                                  />
+                                )}
+                                {attachment.type === 'audio' && (
+                                  <audio
+                                    src={attachmentUrl}
+                                    controls
+                                    style={{ width: '100%' }}
+                                  />
+                                )}
+                                {(attachment.type === 'file' || !attachment.type) && (
+                                  <Button
+                                    size="xs"
+                                    variant="light"
+                                    component="a"
+                                    href={attachmentUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    leftSection={<IconUpload size={14} />}
+                                  >
+                                    View Attachment
+                                  </Button>
+                                )}
+                              </Paper>
+                            )}
+                            
+                            {/* Show answer value */}
+                            {response.value ? (
+                              isFileField ? (
+                                <Group gap="xs">
+                                  <IconUpload size={16} />
+                                  <Button
+                                    size="xs"
+                                    variant="light"
+                                    component="a"
+                                    href={fileUrl || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    View Uploaded File
+                                  </Button>
+                                </Group>
+                              ) : (
+                                <Badge
+                                  size="md"
+                                  variant="filled"
+                                  color="indigo"
+                                  radius="md"
+                                  style={{ 
+                                    padding: '6px 12px',
+                                    fontSize: '13px',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  {response.value}
+                                </Badge>
+                              )
+                            ) : (
+                              <Badge
+                                size="md"
+                                variant="light"
+                                color="gray"
+                                radius="md"
+                                style={{ 
+                                  padding: '6px 12px',
+                                  fontSize: '13px',
+                                  fontStyle: 'italic'
+                                }}
+                              >
+                                No answer
+                              </Badge>
+                            )}
+                          </Stack>
+                        </Paper>
+                      )
+                    })}
+                  </Stack>
 
                   {/* Footer */}
                   <Group justify="space-between" align="center" mt="xs">

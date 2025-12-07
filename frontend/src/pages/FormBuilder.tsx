@@ -1599,6 +1599,9 @@ function FormBuilder() {
                       placeholder="Select field type"
                       searchable
                       allowDeselect={false}
+                      comboboxProps={{ withinPortal: true }}
+                      maxDropdownHeight={400}
+                      limit={20}
                     />
                     <TextInput
                       label="Placeholder"
