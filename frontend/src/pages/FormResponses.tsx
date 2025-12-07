@@ -14,17 +14,15 @@ import {
   Paper,
   Divider,
   Grid,
-  ScrollArea,
   Tooltip,
   ActionIcon,
   Box,
   Modal,
   Pagination,
-  Center,
   Image,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconAlertCircle, IconFileText, IconCalendar, IconCheck, IconUser, IconClock, IconTrash, IconPhoto, IconVideo, IconMusic, IconUpload } from '@tabler/icons-react'
+import { IconArrowLeft, IconAlertCircle, IconFileText, IconCheck, IconClock, IconTrash, IconPhoto, IconVideo, IconMusic, IconUpload } from '@tabler/icons-react'
 import { formAPI, builderAPI, uploadAPI } from '../services/api'
 
 interface Submission {
@@ -66,13 +64,14 @@ function FormResponses() {
     }
   }, [formId])
 
-  const getFileUrl = (url: string, type?: string) => {
-    if (!url) return null
+  const getFileUrl = (url: string | null | undefined, type?: string) => {
+    if (!url || typeof url !== 'string' || url.trim() === '') return null
     // If value is already a full URL, return it
     if (url.startsWith('http')) return url
     // Otherwise, construct the URL from the filename
     const parts = url.split('/')
     const filename = parts[parts.length - 1]
+    if (!filename || filename.trim() === '') return null
     const fileType = type || 'file'
     return uploadAPI.getFileUrl(fileType, filename)
   }
@@ -300,7 +299,7 @@ function FormResponses() {
                   <Grid>
                     {Object.entries(submission.responses).map(([fieldName, response]) => {
                       const attachment = response.options?.attachment
-                      const attachmentUrl = attachment ? getFileUrl(attachment.url, attachment.type) : null
+                      const attachmentUrl = attachment && attachment.url ? getFileUrl(attachment.url, attachment.type) : null
                       const isFileField = response.field_type === 'file'
                       const responseValue = response.value || ''
                       const fileUrl = isFileField && responseValue ? getFileUrl(responseValue, 'file') : null
@@ -309,6 +308,7 @@ function FormResponses() {
                         ? responseValue.split(',').map(v => v.trim()).filter(v => v).join(', ')
                         : responseValue
                       const hasValue = displayValue && String(displayValue).trim() !== ''
+                      const hasAttachment = attachment && attachmentUrl
                       
                       return (
                         <Grid.Col key={fieldName} span={{ base: 12, sm: 6, md: 4 }}>
@@ -325,7 +325,7 @@ function FormResponses() {
                               </Group>
                               
                               {/* Show attachment if exists */}
-                              {attachmentUrl && (
+                              {hasAttachment && (
                                 <Paper p="xs" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
                                   <Group gap="xs" mb="xs">
                                     {attachment.type === 'image' && <IconPhoto size={14} />}
