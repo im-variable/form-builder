@@ -9,6 +9,7 @@ services:
     volumes:
       - ./form_builder.db:/app/form_builder.db
       - ./app:/app/app
+      - ./uploads:/app/uploads
     environment:
       - DATABASE_URL=sqlite:///./form_builder.db
     restart: unless-stopped

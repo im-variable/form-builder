@@ -9,6 +9,14 @@ const api = axios.create({
   },
 })
 
+// File upload API (multipart/form-data)
+const uploadApi = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+})
+
 // Types
 export interface Form {
   id: number
@@ -320,6 +328,26 @@ export const builderAPI = {
 
   deleteNavigationRule: async (ruleId: number): Promise<void> => {
     await api.delete(`/builder/navigation-rules/${ruleId}`)
+  },
+}
+
+// File Upload API
+export const uploadAPI = {
+  uploadFile: async (fileType: 'image' | 'video' | 'audio' | 'file', file: File): Promise<{
+    filename: string
+    original_filename: string
+    file_type: string
+    file_size: number
+    file_url: string
+  }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await uploadApi.post(`/upload/${fileType}`, formData)
+    return response.data
+  },
+
+  getFileUrl: (fileType: string, filename: string): string => {
+    return `${API_BASE_URL}/upload/file/${fileType}/${filename}`
   },
 }
 

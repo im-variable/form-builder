@@ -208,7 +208,7 @@ class FormRendererService:
                 field.id,
                     target_conditions,
                     condition_evaluation_answers
-                )
+            )
                 
                 # Apply condition results
                 has_visibility_conditions = any(c.action.value in ["show", "hide"] for c in target_conditions)
@@ -493,15 +493,15 @@ class FormRendererService:
             submission.completed_at = datetime.now(timezone.utc)
             db.commit()
             db.refresh(submission)
-
-        return FormRenderResponse(
-            form_id=form_id,
-            form_title=form.title,
+                
+                return FormRenderResponse(
+                    form_id=form_id,
+                    form_title=form.title,
             current_page=rendered_page,
             next_page_id=next_page_id,
-            is_complete=is_complete,
-            progress=round(progress, 2)
-        )
+                    is_complete=is_complete,
+                    progress=round(progress, 2)
+                )
 
     @staticmethod
     def render_page_for_submission(
@@ -700,7 +700,7 @@ class FormRendererService:
         # This is important for navigation rules to work correctly when going back
         if submission.current_page_id != page.id:
             submission.current_page_id = page.id
-            db.commit()
+        db.commit()
             db.refresh(submission)
 
         return FormRenderResponse(

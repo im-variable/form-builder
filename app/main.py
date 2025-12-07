@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-from app.routers import builder, renderer, submission
+from app.routers import builder, renderer, submission, upload
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -25,6 +25,7 @@ app.add_middleware(
 app.include_router(builder.router, prefix="/api/v1/builder", tags=["Form Builder"])
 app.include_router(renderer.router, prefix="/api/v1/renderer", tags=["Form Renderer"])
 app.include_router(submission.router, prefix="/api/v1/submission", tags=["Form Submission"])
+app.include_router(upload.router, prefix="/api/v1/upload", tags=["File Upload"])
 
 
 @app.get("/")

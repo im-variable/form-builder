@@ -19,6 +19,9 @@ class FieldType(str, enum.Enum):
     CHECKBOX = "checkbox"
     BOOLEAN = "boolean"
     FILE = "file"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
     RATING = "rating"
 
 

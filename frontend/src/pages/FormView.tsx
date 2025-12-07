@@ -366,25 +366,25 @@ function FormView() {
                   }
                   
                   return (
-                    <FieldRenderer
+                  <FieldRenderer
                       key={`${field.id}-${fieldWithLocalState.is_visible}`}
                       field={fieldWithLocalState}
-                      value={answers[field.name]}
-                      onChange={(value) => handleFieldChange(field.name, value)}
-                    />
+                    value={answers[field.name]}
+                    onChange={(value) => handleFieldChange(field.name, value)}
+                  />
                   )
                 })}
             </Stack>
 
             <Group justify="space-between" mt="xl" pt="md" style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}>
               <Group>
-                <Button
-                  variant="default"
-                  leftSection={<IconX size={18} />}
-                  onClick={() => navigate('/')}
-                >
-                  Cancel
-                </Button>
+              <Button
+                variant="default"
+                leftSection={<IconX size={18} />}
+                onClick={() => navigate('/')}
+              >
+                Cancel
+              </Button>
                 {submissionId && !formData.current_page.is_first && (
                   <Button
                     variant="default"

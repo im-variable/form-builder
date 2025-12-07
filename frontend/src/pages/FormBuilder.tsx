@@ -26,10 +26,12 @@ import {
   Radio,
   Switch,
   Rating,
+  FileButton,
+  Image,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter } from '@tabler/icons-react'
-import { builderAPI, Form, Page, Field } from '../services/api'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter, IconUpload, IconX, IconPhoto, IconVideo, IconMusic } from '@tabler/icons-react'
+import { builderAPI, uploadAPI, Form, Page, Field } from '../services/api'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
@@ -43,6 +45,7 @@ const FIELD_TYPES = [
   { value: 'radio', label: 'Radio' },
   { value: 'checkbox', label: 'Checkbox' },
   { value: 'boolean', label: 'Boolean' },
+  { value: 'file', label: 'File' },
   { value: 'rating', label: 'Rating' },
 ]
 
@@ -66,6 +69,7 @@ function FormBuilder() {
   const [pageTitle, setPageTitle] = useState('')
   const [pageDescription, setPageDescription] = useState('')
   const [isFirstPage, setIsFirstPage] = useState(false)
+  const [editingPageId, setEditingPageId] = useState<number | null>(null)
 
   // Field creation state
   const [fieldName, setFieldName] = useState('')
@@ -84,6 +88,14 @@ function FormBuilder() {
   // Rating configuration
   const [ratingMin, setRatingMin] = useState(1)
   const [ratingMax, setRatingMax] = useState(5)
+
+  // Attachment state (for any field type)
+  const [attachmentType, setAttachmentType] = useState<'image' | 'video' | 'audio' | 'file' | ''>('')
+  const [attachmentFileUrl, setAttachmentFileUrl] = useState<string>('')
+  const [attachmentUrlInput, setAttachmentUrlInput] = useState<string>('')
+  const [useAttachmentUrlInput, setUseAttachmentUrlInput] = useState(false)
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
 
   // Edit mode state
   const [editingFieldId, setEditingFieldId] = useState<number | null>(null)
@@ -220,6 +232,20 @@ function FormBuilder() {
     }
   }
 
+  const handleEditPage = (page: Page) => {
+    setEditingPageId(page.id)
+    setPageTitle(page.title)
+    setPageDescription(page.description || '')
+    setIsFirstPage(page.is_first || false)
+  }
+
+  const handleCancelEditPage = () => {
+    setEditingPageId(null)
+    setPageTitle('')
+    setPageDescription('')
+    setIsFirstPage(false)
+  }
+
   const handleCreatePage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentForm || !pageTitle.trim()) {
@@ -230,24 +256,39 @@ function FormBuilder() {
     try {
       setLoading(true)
       setError(null)
-      const page = await builderAPI.createPage({
-        form_id: currentForm.id,
-        title: pageTitle,
-        description: pageDescription || undefined,
-        order: pages.length + 1,
-        is_first: isFirstPage || pages.length === 0,
-      })
-      // Reload all pages to get updated is_first status (backend ensures only one is first)
-      const updatedPages = await builderAPI.getPages(currentForm.id)
-      setPages(updatedPages)
-      setCurrentPage(page)
-      setPageTitle('')
-      setPageDescription('')
-      setIsFirstPage(false)
-      setActiveStep(2)
-      await loadFields(page.id)
+      
+      if (editingPageId) {
+        // Update existing page
+        const updatedPage = await builderAPI.updatePage(editingPageId, {
+          title: pageTitle,
+          description: pageDescription || undefined,
+          is_first: isFirstPage,
+        })
+        // Reload all pages to get updated is_first status
+        const updatedPages = await builderAPI.getPages(currentForm.id)
+        setPages(updatedPages)
+        handleCancelEditPage()
+      } else {
+        // Create new page
+        const page = await builderAPI.createPage({
+          form_id: currentForm.id,
+          title: pageTitle,
+          description: pageDescription || undefined,
+          order: pages.length + 1,
+          is_first: isFirstPage || pages.length === 0,
+        })
+        // Reload all pages to get updated is_first status (backend ensures only one is first)
+        const updatedPages = await builderAPI.getPages(currentForm.id)
+        setPages(updatedPages)
+        setCurrentPage(page)
+        setPageTitle('')
+        setPageDescription('')
+        setIsFirstPage(false)
+        setActiveStep(2)
+        await loadFields(page.id)
+      }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create page')
+      setError(err.response?.data?.detail || `Failed to ${editingPageId ? 'update' : 'create'} page`)
     } finally {
       setLoading(false)
     }
@@ -627,9 +668,37 @@ function FormBuilder() {
     }
   }, [activeStep, currentForm])
 
+  // Reset editing state when current page changes
+  useEffect(() => {
+    if (currentPage && editingFieldId) {
+      setEditingFieldId(null)
+      setFieldName('')
+      setFieldLabel('')
+      setFieldType('text')
+      setFieldPlaceholder('')
+      setFieldHelpText('')
+      setFieldRequired(false)
+      setFieldVisible(true)
+      setFieldChoices([])
+      setNewChoiceValue('')
+      setNewChoiceLabel('')
+      setRatingMin(1)
+      setRatingMax(5)
+      setAttachmentType('')
+      setAttachmentFileUrl('')
+      setAttachmentUrlInput('')
+      setUseAttachmentUrlInput(false)
+      setAttachmentUploadError(null)
+    }
+  }, [currentPage?.id])
+
   const handlePageSelect = async (page: Page) => {
     setCurrentPage(page)
     setActiveStep(2)
+    // Reset form to "Add Field" mode when selecting a page
+    if (editingFieldId) {
+      handleCancelEdit()
+    }
     await loadFields(page.id)
   }
 
@@ -654,6 +723,44 @@ function FormBuilder() {
       setRatingMin(1)
       setRatingMax(5)
     }
+    // Note: Attachment is independent of field type, so we don't reset it here
+  }
+
+  const handleAttachmentUpload = async (file: File | null, type: 'image' | 'video' | 'audio' | 'file') => {
+    if (!file) return
+
+    setUploadingAttachment(true)
+    setAttachmentUploadError(null)
+
+    try {
+      const result = await uploadAPI.uploadFile(type, file)
+      setAttachmentFileUrl(result.file_url)
+      setAttachmentType(type)
+    } catch (err: any) {
+      setAttachmentUploadError(err.response?.data?.detail || 'Failed to upload file')
+      console.error('File upload error:', err)
+    } finally {
+      setUploadingAttachment(false)
+    }
+  }
+
+  const handleRemoveAttachment = () => {
+    setAttachmentFileUrl('')
+    setAttachmentUrlInput('')
+    setAttachmentType('')
+    setAttachmentUploadError(null)
+  }
+
+  const getAttachmentFileUrl = () => {
+    const fileUrl = attachmentFileUrl || attachmentUrlInput
+    if (!fileUrl) return null
+    // If value is already a full URL, return it
+    if (fileUrl.startsWith('http')) return fileUrl
+    // Otherwise, construct the URL from the filename
+    const parts = fileUrl.split('/')
+    const filename = parts[parts.length - 1]
+    const fileType = attachmentType || 'file'
+    return uploadAPI.getFileUrl(fileType, filename)
   }
 
   const handleEditField = (field: Field) => {
@@ -665,6 +772,27 @@ function FormBuilder() {
     setFieldHelpText(field.help_text || '')
     setFieldRequired(field.is_required)
     setFieldVisible(field.is_visible !== undefined ? field.is_visible : true)
+    
+    // Load attachment from options.attachment
+    if (field.options?.attachment) {
+      const attachment = field.options.attachment
+      setAttachmentType(attachment.type || '')
+      const attachmentUrl = attachment.url || ''
+      if (attachmentUrl.startsWith('http')) {
+        setAttachmentUrlInput(attachmentUrl)
+        setAttachmentFileUrl('')
+        setUseAttachmentUrlInput(true)
+      } else {
+        setAttachmentFileUrl(attachmentUrl)
+        setAttachmentUrlInput('')
+        setUseAttachmentUrlInput(false)
+      }
+    } else {
+      setAttachmentType('')
+      setAttachmentFileUrl('')
+      setAttachmentUrlInput('')
+      setUseAttachmentUrlInput(false)
+    }
 
     // Parse options for select/radio/checkbox
     if (field.options?.choices) {
@@ -696,6 +824,11 @@ function FormBuilder() {
     setNewChoiceLabel('')
     setRatingMin(1)
     setRatingMax(5)
+    setAttachmentType('')
+    setAttachmentFileUrl('')
+    setAttachmentUrlInput('')
+    setUseAttachmentUrlInput(false)
+    setAttachmentUploadError(null)
   }
 
   const handleDeleteField = (field: Field) => {
@@ -788,6 +921,18 @@ function FormBuilder() {
         parsedOptions = { min: ratingMin, max: ratingMax }
       }
 
+      // Add attachment to options if present
+      const attachmentUrl = attachmentFileUrl || attachmentUrlInput
+      if (attachmentType && attachmentUrl && attachmentUrl.trim() !== '') {
+        if (!parsedOptions) {
+          parsedOptions = {}
+        }
+        parsedOptions.attachment = {
+          type: attachmentType,
+          url: attachmentUrl.trim()
+        }
+      }
+
       if (editingFieldId) {
         // Update existing field
         const updatedField = await builderAPI.updateField(editingFieldId, {
@@ -805,24 +950,56 @@ function FormBuilder() {
         handleCancelEdit()
       } else {
         // Create new field
-        const field = await builderAPI.createField({
+        const fieldData: any = {
           page_id: currentPage.id,
-          name: fieldName,
-          label: fieldLabel,
+          name: fieldName.trim(),
+          label: fieldLabel.trim(),
           field_type: fieldType,
-          placeholder: fieldPlaceholder || undefined,
-          help_text: fieldHelpText || undefined,
           order: fields.length + 1,
           is_required: fieldRequired,
           is_visible: fieldVisible,
-          options: parsedOptions,
-        })
+        }
+        
+        // Only include optional fields if they have values
+        if (fieldPlaceholder && fieldPlaceholder.trim()) {
+          fieldData.placeholder = fieldPlaceholder.trim()
+        }
+        if (fieldHelpText && fieldHelpText.trim()) {
+          fieldData.help_text = fieldHelpText.trim()
+        }
+        if (parsedOptions) {
+          fieldData.options = parsedOptions
+        }
+        
+        console.log('Creating field with data:', fieldData)
+        const field = await builderAPI.createField(fieldData)
 
         setFields([...fields, field])
         handleCancelEdit()
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to save field')
+      console.error('Error creating/updating field:', err)
+      console.error('Error response:', err.response?.data)
+      
+      // Handle validation errors (422) - FastAPI returns array of errors
+      if (err.response?.status === 422 && err.response?.data?.detail) {
+        const validationErrors = err.response.data.detail
+        if (Array.isArray(validationErrors)) {
+          // Extract error messages from validation errors
+          const errorMessages = validationErrors.map((e: any) => {
+            const field = e.loc ? e.loc.slice(1).join('.') : 'field'
+            return `${field}: ${e.msg}`
+          }).join(', ')
+          setError(errorMessages || 'Validation error')
+        } else if (typeof validationErrors === 'string') {
+          setError(validationErrors)
+        } else {
+          setError('Validation error: ' + JSON.stringify(validationErrors))
+        }
+      } else {
+        const errorMsg = err.response?.data?.detail || err.message || 'Failed to save field'
+        setError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg))
+      }
     } finally {
       setLoading(false)
     }
@@ -910,7 +1087,7 @@ function FormBuilder() {
 
         {error && (
           <Alert icon={<IconAlertCircle size={20} />} title="Error" color="red">
-            {error}
+            {typeof error === 'string' ? error : JSON.stringify(error)}
           </Alert>
         )}
 
@@ -957,7 +1134,21 @@ function FormBuilder() {
             <Grid.Col span={{ base: 12, md: 4 }}>
               <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
                 <Stack gap="md">
-                  <Title order={4}>Pages ({pages.length})</Title>
+                  <Group justify="space-between">
+                    <Title order={4}>Pages ({pages.length})</Title>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<IconPlus size={14} />}
+                      onClick={() => {
+                        handleCancelEditPage()
+                        // Scroll to form or focus on it
+                      }}
+                      title="Add New Page"
+                    >
+                      Add Page
+                    </Button>
+                  </Group>
                   <Divider />
                   {pages.length === 0 ? (
                     <Text size="sm" c="dimmed" ta="center" py="xl">
@@ -1054,10 +1245,10 @@ function FormBuilder() {
                                   variant="light"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handlePageSelect(page)
+                                    handleEditPage(page)
                                   }}
                                   size="sm"
-                                  title="Add/Edit Fields"
+                                  title="Edit Page"
                                 >
                                   <IconEdit size={14} />
                                 </ActionIcon>
@@ -1101,7 +1292,9 @@ function FormBuilder() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 8 }}>
               <Card shadow="sm" padding="md" radius="md" withBorder>
-                <Title order={4} mb="md">Add Pages to "{currentForm.title}"</Title>
+                <Title order={4} mb="md">
+                  {editingPageId ? 'Edit Page' : `Add Pages to "${currentForm.title}"`}
+                </Title>
                 <form onSubmit={handleCreatePage}>
                   <Stack gap="sm">
                     <TextInput
@@ -1122,22 +1315,33 @@ function FormBuilder() {
                     />
                     <Checkbox
                       label="Mark as first page"
-                      description={pages.some(p => p.is_first) ? "Note: This will unmark the current first page" : "This will be the starting page of the form"}
+                      description={pages.some(p => p.is_first && p.id !== editingPageId) ? "Note: This will unmark the current first page" : "This will be the starting page of the form"}
                       checked={isFirstPage}
                       onChange={(e) => setIsFirstPage(e.currentTarget.checked)}
                       size="sm"
                     />
-                    <Button
-                      type="submit"
-                      loading={loading}
-                      leftSection={<IconPlus size={16} />}
-                      variant="gradient"
-                      gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
-                      fullWidth
-                      size="sm"
-                    >
-                      Add Page
-                    </Button>
+                    <Group>
+                      <Button
+                        type="submit"
+                        loading={loading}
+                        leftSection={editingPageId ? <IconCheck size={16} /> : <IconPlus size={16} />}
+                        variant="gradient"
+                        gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                        size="sm"
+                      >
+                        {editingPageId ? 'Update Page' : 'Add Page'}
+                      </Button>
+                      {editingPageId && (
+                        <Button
+                          type="button"
+                          variant="light"
+                          onClick={handleCancelEditPage}
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </Group>
                   </Stack>
                 </form>
               </Card>
@@ -1203,7 +1407,23 @@ function FormBuilder() {
                 <Grid.Col span={{ base: 12, md: 4 }}>
                   <Card shadow="sm" padding="md" radius="md" withBorder style={{ position: 'sticky', top: 20 }}>
                     <Stack gap="md">
-                      <Title order={4}>Fields ({fields.length})</Title>
+                      <Group justify="space-between">
+                        <Title order={4}>Fields ({fields.length})</Title>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<IconPlus size={14} />}
+                          onClick={() => {
+                            if (editingFieldId) {
+                              handleCancelEdit()
+                            }
+                          }}
+                          disabled={!currentPage}
+                          title="Add New Field"
+                        >
+                          Add Field
+                        </Button>
+                      </Group>
                       <Divider />
                       {fields.length === 0 ? (
                         <Text size="sm" c="dimmed" ta="center" py="xl">
@@ -1220,18 +1440,8 @@ function FormBuilder() {
                                 style={{ 
                                   borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
                                   borderWidth: editingFieldId === field.id ? 2 : undefined,
-                                  cursor: 'pointer',
                                   transition: 'all 0.2s',
                                 }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
-                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-indigo-4)'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent'
-                                  e.currentTarget.style.borderColor = editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : 'var(--mantine-color-gray-4)'
-                                }}
-                                onClick={() => handleEditField(field)}
                               >
                                 <Group gap="xs" wrap="nowrap">
                                   <Stack gap={2}>
@@ -1337,6 +1547,21 @@ function FormBuilder() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 8 }}>
                   <Card shadow="sm" padding="md" radius="md" withBorder>
+                    <Group justify="space-between" mb="md">
+                      <Title order={4}>
+                        {editingFieldId ? 'Edit Field' : 'Add New Field'}
+                      </Title>
+                      {editingFieldId && (
+                        <Button
+                          variant="light"
+                          size="sm"
+                          leftSection={<IconPlus size={16} />}
+                          onClick={handleCancelEdit}
+                        >
+                          New Field
+                        </Button>
+                      )}
+                    </Group>
                   <form onSubmit={handleCreateField}>
                   <Stack gap="sm">
                     <Group grow>
@@ -1361,12 +1586,19 @@ function FormBuilder() {
                     </Group>
                     <Select
                       label="Field Type"
-                      value={fieldType}
-                      onChange={(val) => handleFieldTypeChange(val || 'text')}
+                      value={fieldType || 'text'}
+                      onChange={(val) => {
+                        if (val) {
+                          handleFieldTypeChange(val)
+                        }
+                      }}
                       data={FIELD_TYPES}
                       required
                       size="sm"
                       disabled={!currentPage}
+                      placeholder="Select field type"
+                      searchable
+                      allowDeselect={false}
                     />
                     <TextInput
                       label="Placeholder"
@@ -1472,6 +1704,157 @@ function FormBuilder() {
                     </Text>
                   </Paper>
                 )}
+
+                {/* Attachment (optional, for any field type) */}
+                <Paper p="sm" withBorder>
+                  <Text fw={500} size="sm" mb="sm">
+                    Attachment (Optional)
+                  </Text>
+                  <Text size="xs" c="dimmed" mb="sm">
+                    Add an image, video, audio, or file attachment to display with this field
+                  </Text>
+                  {(() => {
+                    const fileUrl = attachmentFileUrl || attachmentUrlInput
+                    const displayUrl = fileUrl ? (fileUrl.startsWith('http') ? fileUrl : getAttachmentFileUrl()) : null
+                    return displayUrl ? (
+                      <Stack gap="sm">
+                        {attachmentType === 'image' && (
+                          <Image
+                            src={displayUrl}
+                            alt="Preview"
+                            maw={300}
+                            mah={200}
+                            fit="contain"
+                            style={{ borderRadius: 4 }}
+                          />
+                        )}
+                        {attachmentType === 'video' && (
+                          <video
+                            src={displayUrl}
+                            controls
+                            style={{ width: '100%', maxWidth: 300, borderRadius: 4 }}
+                          />
+                        )}
+                        {attachmentType === 'audio' && (
+                          <audio
+                            src={displayUrl}
+                            controls
+                            style={{ width: '100%' }}
+                          />
+                        )}
+                        {(attachmentType === 'file' || !attachmentType) && (
+                          <Group gap="xs">
+                            <IconUpload size={20} />
+                            <Text size="sm">File/URL set</Text>
+                          </Group>
+                        )}
+                        <Group gap="xs">
+                          <Button
+                            size="xs"
+                            variant="light"
+                            component="a"
+                            href={displayUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="subtle"
+                            color="red"
+                            leftSection={<IconX size={14} />}
+                            onClick={handleRemoveAttachment}
+                          >
+                            Remove
+                          </Button>
+                        </Group>
+                      </Stack>
+                    ) : (
+                      <Stack gap="sm">
+                        <Select
+                          label="Attachment Type"
+                          placeholder="Select attachment type"
+                          value={attachmentType}
+                          onChange={(val) => {
+                            setAttachmentType((val as 'image' | 'video' | 'audio' | 'file' | '') || '')
+                            setAttachmentFileUrl('')
+                            setAttachmentUrlInput('')
+                          }}
+                          data={[
+                            { value: 'image', label: 'Image' },
+                            { value: 'video', label: 'Video' },
+                            { value: 'audio', label: 'Audio' },
+                            { value: 'file', label: 'File' },
+                          ]}
+                          size="sm"
+                          clearable
+                        />
+                        {attachmentType && (
+                          <>
+                            <Radio.Group
+                              value={useAttachmentUrlInput ? 'url' : 'upload'}
+                              onChange={(val) => {
+                                setUseAttachmentUrlInput(val === 'url')
+                                setAttachmentFileUrl('')
+                                setAttachmentUrlInput('')
+                              }}
+                            >
+                              <Stack gap="xs" mt="xs">
+                                <Radio value="upload" label="Upload File" />
+                                <Radio value="url" label="Enter URL" />
+                              </Stack>
+                            </Radio.Group>
+                            
+                            {useAttachmentUrlInput ? (
+                              <Stack gap="xs">
+                                <TextInput
+                                  placeholder={`Enter ${attachmentType} URL (e.g., https://example.com/file)`}
+                                  value={attachmentUrlInput}
+                                  onChange={(e) => setAttachmentUrlInput(e.target.value)}
+                                  size="sm"
+                                />
+                                <Text size="xs" c="dimmed">
+                                  Enter a URL to the {attachmentType} file
+                                </Text>
+                              </Stack>
+                            ) : (
+                              <Stack gap="xs">
+                                <FileButton
+                                  onChange={(file) => handleAttachmentUpload(file, attachmentType as 'image' | 'video' | 'audio' | 'file')}
+                                  accept={
+                                    attachmentType === 'image' ? 'image/*' :
+                                    attachmentType === 'video' ? 'video/*' :
+                                    attachmentType === 'audio' ? 'audio/*' :
+                                    '*'
+                                  }
+                                  disabled={uploadingAttachment}
+                                >
+                                  {(props) => (
+                                    <Button
+                                      {...props}
+                                      leftSection={<IconUpload size={18} />}
+                                      loading={uploadingAttachment}
+                                      fullWidth
+                                      size="sm"
+                                    >
+                                      {uploadingAttachment ? 'Uploading...' : `Upload ${attachmentType.charAt(0).toUpperCase() + attachmentType.slice(1)}`}
+                                    </Button>
+                                  )}
+                                </FileButton>
+                                {attachmentUploadError && (
+                                  <Text size="xs" c="red">
+                                    {attachmentUploadError}
+                                  </Text>
+                                )}
+                              </Stack>
+                            )}
+                          </>
+                        )}
+                      </Stack>
+                    )
+                  })()}
+                </Paper>
 
                     <Checkbox
                       label="Required field"
