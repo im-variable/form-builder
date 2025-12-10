@@ -1036,6 +1036,7 @@ function FormBuilder() {
               component={Link}
               to="/"
               variant="subtle"
+              color="slate"
               leftSection={<IconArrowLeft size={18} />}
             >
               Back to Home
@@ -1118,8 +1119,7 @@ function FormBuilder() {
                   loading={loading}
                   fullWidth
                   size="sm"
-                  variant="gradient"
-                  gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                  color="indigo"
                 >
                   {isEditMode ? 'Update Form' : 'Create Form'}
                 </Button>
@@ -1139,6 +1139,7 @@ function FormBuilder() {
                     <Button
                       size="xs"
                       variant="light"
+                      color="indigo"
                       leftSection={<IconPlus size={14} />}
                       onClick={() => {
                         handleCancelEditPage()
@@ -1167,17 +1168,17 @@ function FormBuilder() {
                               transition: 'all 0.2s',
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'
-                              e.currentTarget.style.borderColor = 'var(--mantine-color-indigo-4)'
+                              e.currentTarget.style.backgroundColor = '#f8fafc'
+                              e.currentTarget.style.borderColor = '#6366f1'
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.backgroundColor = 'transparent'
-                              e.currentTarget.style.borderColor = 'var(--mantine-color-gray-4)'
+                              e.currentTarget.style.borderColor = '#cbd5e1'
                             }}
                           >
                             <Group gap="xs" wrap="nowrap">
                               {page.is_first ? (
-                                <IconPlayerPlay size={16} style={{ color: 'var(--mantine-color-gray-6)', fill: 'var(--mantine-color-gray-6)' }} />
+                                <IconPlayerPlay size={16} style={{ color: '#64748b', fill: '#64748b' }} />
                               ) : (
                                 <Stack gap={2}>
                                   <ActionIcon
@@ -1278,8 +1279,7 @@ function FormBuilder() {
                       <Button
                         fullWidth
                         size="sm"
-                        variant="gradient"
-                        gradient={{ from: 'green', to: 'teal', deg: 90 }}
+                        color="indigo"
                         leftSection={<IconCheck size={16} />}
                         onClick={handleFinish}
                       >
@@ -1325,8 +1325,7 @@ function FormBuilder() {
                         type="submit"
                         loading={loading}
                         leftSection={editingPageId ? <IconCheck size={16} /> : <IconPlus size={16} />}
-                        variant="gradient"
-                        gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                        color="indigo"
                         size="sm"
                       >
                         {editingPageId ? 'Update Page' : 'Add Page'}
@@ -1335,6 +1334,7 @@ function FormBuilder() {
                         <Button
                           type="button"
                           variant="light"
+                          color="violet"
                           onClick={handleCancelEditPage}
                           size="sm"
                         >
@@ -1355,6 +1355,7 @@ function FormBuilder() {
             <Group mb="md">
               <Button
                 variant="light"
+                color="violet"
                 size="sm"
                 onClick={() => {
                   setActiveStep(1)
@@ -1373,6 +1374,7 @@ function FormBuilder() {
                 </Alert>
                 <Button
                   variant="light"
+                  color="violet"
                   size="sm"
                   onClick={() => setActiveStep(1)}
                   leftSection={<IconArrowLeft size={16} />}
@@ -1412,6 +1414,7 @@ function FormBuilder() {
                         <Button
                           size="xs"
                           variant="light"
+                          color="indigo"
                           leftSection={<IconPlus size={14} />}
                           onClick={() => {
                             if (editingFieldId) {
@@ -1438,7 +1441,7 @@ function FormBuilder() {
                                 p="sm" 
                                 withBorder
                                 style={{ 
-                                  borderColor: editingFieldId === field.id ? 'var(--mantine-color-indigo-6)' : undefined,
+                                  borderColor: editingFieldId === field.id ? '#6366f1' : undefined,
                                   borderWidth: editingFieldId === field.id ? 2 : undefined,
                                   transition: 'all 0.2s',
                                 }}
@@ -1478,7 +1481,7 @@ function FormBuilder() {
                                         <Badge color="red" variant="light" size="xs">Required</Badge>
                                       )}
                                       {!field.is_visible && (
-                                        <Badge color="gray" variant="light" size="xs">Hidden</Badge>
+                                        <Badge color="slate" variant="light" size="xs">Hidden</Badge>
                                       )}
                                     </Group>
                                   </div>
@@ -1533,8 +1536,7 @@ function FormBuilder() {
                           <Button
                             fullWidth
                             size="sm"
-                            variant="gradient"
-                            gradient={{ from: 'green', to: 'teal', deg: 90 }}
+                            color="indigo"
                             leftSection={<IconCheck size={16} />}
                             onClick={handleFinish}
                           >
@@ -1554,6 +1556,7 @@ function FormBuilder() {
                       {editingFieldId && (
                         <Button
                           variant="light"
+                          color="indigo"
                           size="sm"
                           leftSection={<IconPlus size={16} />}
                           onClick={handleCancelEdit}
@@ -1668,6 +1671,7 @@ function FormBuilder() {
                       disabled={!newChoiceValue.trim() || !newChoiceLabel.trim()}
                       leftSection={<IconPlus size={14} />}
                       variant="light"
+                      color="indigo"
                       fullWidth
                       mt="xs"
                       size="sm"
@@ -1755,6 +1759,7 @@ function FormBuilder() {
                           <Button
                             size="xs"
                             variant="light"
+                            color="indigo"
                             component="a"
                             href={displayUrl}
                             target="_blank"
@@ -1839,6 +1844,7 @@ function FormBuilder() {
                                       leftSection={<IconUpload size={18} />}
                                       loading={uploadingAttachment}
                                       fullWidth
+                                      color="indigo"
                                       size="sm"
                                     >
                                       {uploadingAttachment ? 'Uploading...' : `Upload ${attachmentType.charAt(0).toUpperCase() + attachmentType.slice(1)}`}
@@ -1880,8 +1886,7 @@ function FormBuilder() {
                         type="submit"
                         loading={loading}
                         leftSection={editingFieldId ? <IconCheck size={16} /> : <IconPlus size={16} />}
-                        variant="gradient"
-                        gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                        color="indigo"
                         disabled={!currentPage}
                         size="sm"
                       >
@@ -1890,6 +1895,7 @@ function FormBuilder() {
                   {editingFieldId && (
                     <Button
                       variant="light"
+                      color="violet"
                       onClick={handleCancelEdit}
                       size="sm"
                     >
@@ -1898,6 +1904,7 @@ function FormBuilder() {
                   )}
                   <Button
                     variant="light"
+                    color="violet"
                     onClick={() => {
                       setActiveStep(1)
                       setCurrentPage(null)
@@ -1926,12 +1933,12 @@ function FormBuilder() {
                 width: 80, 
                 height: 80, 
                 borderRadius: '50%', 
-                background: 'var(--mantine-color-green-1)',
+                background: 'linear-gradient(135deg, #eef2ff 0%, #ede9fe 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <IconCheck size={48} stroke={2} style={{ color: 'var(--mantine-color-green-6)' }} />
+                <IconCheck size={48} stroke={2} style={{ color: '#6366f1' }} />
               </div>
               <div style={{ textAlign: 'center' }}>
                 <Title order={2} mb="xs">Form Created!</Title>
@@ -1943,8 +1950,7 @@ function FormBuilder() {
                 <Button
                   onClick={handleFinish}
                   size="lg"
-                  variant="gradient"
-                  gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                  color="indigo"
                 >
                   View Form
                 </Button>
@@ -1952,6 +1958,7 @@ function FormBuilder() {
                   component={Link}
                   to="/builder"
                   variant="light"
+                  color="violet"
                   size="lg"
                 >
                   Create Another Form
@@ -1978,6 +1985,7 @@ function FormBuilder() {
             <Group justify="flex-end" mt="md">
               <Button
                 variant="light"
+                color="violet"
                 onClick={closeDeleteModal}
                 disabled={deletingForm}
               >
@@ -2102,13 +2110,12 @@ function FormBuilder() {
                 );
               })}
               <Group justify="flex-end" mt="md">
-                <Button onClick={closePreviewModal}>Close Preview</Button>
+                <Button onClick={closePreviewModal} color="violet" variant="light">Close Preview</Button>
                 {currentForm && (
                   <Button
                     component={Link}
                     to={`/form/${currentForm.id}`}
-                    variant="gradient"
-                    gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                    color="indigo"
                   >
                     View Live Form
                   </Button>
@@ -2265,8 +2272,7 @@ function FormBuilder() {
                   onClick={handleCreateNavigationRule}
                   loading={loading}
                   leftSection={<IconPlus size={18} />}
-                  variant="gradient"
-                  gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                  color="indigo"
                   fullWidth
                 >
                   Add Navigation Rule
@@ -2461,8 +2467,7 @@ function FormBuilder() {
                     onClick={handleCreateFieldCondition}
                     disabled={!conditionSourcePageId || !conditionSourceFieldId || !conditionOperator || (!conditionValue && conditionOperator !== 'is_empty' && conditionOperator !== 'is_not_empty') || !conditionAction || loading}
                     leftSection={editingConditionId ? <IconCheck size={16} /> : <IconPlus size={16} />}
-                    variant="gradient"
-                    gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                    color="indigo"
                     size="sm"
                   >
                     {editingConditionId ? 'Update Condition' : 'Add Condition'}
@@ -2470,6 +2475,7 @@ function FormBuilder() {
                   {editingConditionId && (
                     <Button
                       variant="light"
+                      color="violet"
                       onClick={handleCancelEditCondition}
                       disabled={loading}
                       size="sm"
@@ -2495,7 +2501,7 @@ function FormBuilder() {
               Are you sure you want to delete this page?
             </Text>
             {pageToDelete && (
-              <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+              <Paper p="sm" withBorder>
                 <Text size="sm" fw={500} mb="xs">Page Details:</Text>
                 <Text size="sm">{pageToDelete.title}</Text>
               </Paper>
@@ -2507,6 +2513,7 @@ function FormBuilder() {
             <Group justify="flex-end" mt="md">
               <Button
                 variant="light"
+                color="violet"
                 onClick={closeDeletePageModal}
                 disabled={loading}
               >
@@ -2536,7 +2543,7 @@ function FormBuilder() {
               Are you sure you want to delete this field?
             </Text>
             {fieldToDelete && (
-              <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+              <Paper p="sm" withBorder>
                 <Text size="sm" fw={500} mb="xs">Field Details:</Text>
                 <Text size="sm"><strong>Label:</strong> {fieldToDelete.label}</Text>
                 <Text size="sm"><strong>Name:</strong> {fieldToDelete.name}</Text>
@@ -2549,6 +2556,7 @@ function FormBuilder() {
             <Group justify="flex-end" mt="md">
               <Button
                 variant="light"
+                color="violet"
                 onClick={closeDeleteFieldModal}
                 disabled={loading}
               >
@@ -2583,6 +2591,7 @@ function FormBuilder() {
             <Group justify="flex-end" mt="md">
               <Button
                 variant="light"
+                color="violet"
                 onClick={closeDeleteRuleModal}
                 disabled={loading}
               >
@@ -2617,6 +2626,7 @@ function FormBuilder() {
             <Group justify="flex-end" mt="md">
               <Button
                 variant="light"
+                color="violet"
                 onClick={closeDeleteConditionModal}
                 disabled={loading}
               >

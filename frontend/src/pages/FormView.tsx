@@ -12,6 +12,7 @@ import {
   Loader,
   Alert,
   Paper,
+  useMantineTheme,
 } from '@mantine/core'
 import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck, IconArrowLeft } from '@tabler/icons-react'
 import { formAPI, FormRenderResponse, SubmitAnswerRequest, Field } from '../services/api'
@@ -19,6 +20,7 @@ import FieldRenderer from '../components/FieldRenderer'
 import { evaluateFieldConditions } from '../utils/conditionEvaluator'
 
 function FormView() {
+  const theme = useMantineTheme()
   const { formId } = useParams<{ formId: string }>()
   const navigate = useNavigate()
   const [formData, setFormData] = useState<FormRenderResponse | null>(null)
@@ -312,29 +314,71 @@ function FormView() {
   return (
     <Container size="md" py="xl">
       {/* Progress Bar */}
-      <Paper shadow="sm" p="md" radius="md" withBorder mb="xl">
-        <Group justify="space-between" mb="xs">
-          <Text size="sm" fw={500}>Progress</Text>
-          <Text size="lg" fw={700} c="indigo">{Math.round(formData.progress)}%</Text>
+      <Card shadow="md" p="lg" radius="lg" withBorder mb="xl">
+        <Group justify="space-between" mb="md">
+          <div>
+            <Text size="sm" fw={600} mb={4} style={{ letterSpacing: '0.02em' }}>Form Progress</Text>
+            <Text size="xs" c="dimmed">Complete the form to submit</Text>
+          </div>
+          <div style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            color: 'white',
+            boxShadow: 'var(--shadow-colored)',
+          }}>
+            <Text size="xl" fw={700}>{Math.round(formData.progress)}%</Text>
+          </div>
         </Group>
-        <Progress value={formData.progress} size="lg" radius="xl" />
-      </Paper>
+        <Progress value={formData.progress} size="xl" radius="xl" color="indigo" />
+      </Card>
 
       {/* Form Card */}
-      <Card key={`page-${formData.current_page.id}`} shadow="md" padding="xl" radius="md" withBorder>
+      <Card key={`page-${formData.current_page.id}`} shadow="lg" padding="xl" radius="lg" withBorder>
         <Stack gap="xl">
-          <Group gap="md" align="flex-start">
-            <IconFileText size={32} stroke={1.5} style={{ color: 'var(--mantine-color-indigo-6)' }} />
-            <div style={{ flex: 1 }}>
-              <Title order={1} mb="xs">{formData.form_title}</Title>
-              {formData.current_page.description && (
-                <Text c="dimmed">{formData.current_page.description}</Text>
-              )}
+          <div style={{
+            paddingBottom: '1.5rem',
+            borderBottom: `2px solid ${theme.colors.slate[2]}`,
+          }}>
+            <Group gap="md" align="flex-start" mb="md">
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: 'var(--shadow-colored)',
+              }}>
+                <IconFileText size={32} stroke={2.5} style={{ color: 'white' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Title order={1} mb="xs" style={{ 
+                  letterSpacing: '-0.02em',
+                  fontWeight: 700,
+                }}>
+                  {formData.form_title}
+                </Title>
+                {formData.current_page.description && (
+                  <Text c="dimmed" size="sm" style={{ 
+                    lineHeight: 1.6,
+                    color: theme.colors.slate[5],
+                  }}>
+                    {formData.current_page.description}
+                  </Text>
+                )}
+              </div>
+            </Group>
+            <div style={{ paddingLeft: '80px' }}>
+              <Title order={3} style={{ 
+                letterSpacing: '-0.01em',
+                fontWeight: 600,
+                color: theme.colors.slate[6],
+              }}>
+                {formData.current_page.title}
+              </Title>
             </div>
-          </Group>
-
-          <div>
-            <Title order={2} mb="md">{formData.current_page.title}</Title>
           </div>
 
           {error && (
@@ -376,21 +420,31 @@ function FormView() {
                 })}
             </Stack>
 
-            <Group justify="space-between" mt="xl" pt="md" style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}>
-              <Group>
-              <Button
-                variant="default"
-                leftSection={<IconX size={18} />}
-                onClick={() => navigate('/')}
-              >
-                Cancel
-              </Button>
+            <Group justify="space-between" mt="xl" pt="lg" style={{ 
+              borderTop: `2px solid ${theme.colors.slate[2]}`,
+              backgroundColor: theme.colors.slate[0],
+              margin: '1.5rem -1.5rem -1.5rem -1.5rem',
+              padding: '1.5rem',
+              borderRadius: '0 0 16px 16px',
+            }}>
+              <Group gap="sm">
+                <Button
+                  variant="default"
+                  leftSection={<IconX size={18} />}
+                  onClick={() => navigate('/')}
+                  size="md"
+                  style={{ fontWeight: 600 }}
+                >
+                  Cancel
+                </Button>
                 {submissionId && !formData.current_page.is_first && (
                   <Button
                     variant="default"
                     leftSection={<IconArrowLeft size={18} />}
                     onClick={handlePreviousPage}
                     disabled={loading}
+                    size="md"
+                    style={{ fontWeight: 600 }}
                   >
                     Back
                   </Button>
@@ -400,8 +454,12 @@ function FormView() {
                 type="submit"
                 loading={submitting}
                 rightSection={!submitting && (formData.is_complete || !formData.next_page_id) ? <IconCheck size={18} /> : <IconArrowRight size={18} />}
-                variant="gradient"
-                gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+                color="indigo"
+                size="md"
+                style={{ 
+                  padding: '0.75rem 1.5rem',
+                  fontWeight: 600,
+                }}
               >
                 {submitting 
                   ? 'Submitting...' 

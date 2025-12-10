@@ -20,6 +20,7 @@ import {
   Modal,
   Pagination,
   Image,
+  useMantineTheme,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconArrowLeft, IconAlertCircle, IconFileText, IconCheck, IconClock, IconTrash, IconPhoto, IconVideo, IconMusic, IconUpload } from '@tabler/icons-react'
@@ -46,6 +47,7 @@ interface Submission {
 }
 
 function FormResponses() {
+  const theme = useMantineTheme()
   const { formId } = useParams<{ formId: string }>()
   const [form, setForm] = useState<any>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -158,32 +160,47 @@ function FormResponses() {
     <Container size="xl" py="xl">
       <Stack gap="lg">
         {/* Header */}
-        <Group justify="space-between" align="center" mb="md">
-          <div>
-            <Button
-              component={Link}
-              to="/"
-              variant="subtle"
-              leftSection={<IconArrowLeft size={18} />}
-              mb="sm"
-            >
-              Back to Home
-            </Button>
-            <Title order={1} mb="xs">{form?.title || 'Form Responses'}</Title>
-            {form?.description && (
-              <Text c="dimmed" size="sm">{form.description}</Text>
-            )}
-          </div>
-          <Badge size="xl" color="green" variant="filled" p="md" radius="md">
-            <Group gap={6}>
-              <IconCheck size={20} />
-              <Text fw={700} size="lg">{submissions.length}</Text>
-              <Text size="sm" opacity={0.9}>
-                {submissions.length === 1 ? 'Response' : 'Responses'}
+        <Card shadow="md" padding="lg" radius="lg" withBorder mb="xl">
+          <Group justify="space-between" align="center">
+            <div>
+              <Button
+                component={Link}
+                to="/"
+                variant="subtle"
+                leftSection={<IconArrowLeft size={18} />}
+                mb="sm"
+                size="sm"
+                style={{ fontWeight: 600 }}
+              >
+                Back to Home
+              </Button>
+              <Title order={1} mb="xs" style={{ letterSpacing: '-0.02em' }}>
+                {form?.title || 'Form Responses'}
+              </Title>
+              {form?.description && (
+              <Text c="dimmed" size="sm">
+                {form.description}
               </Text>
-            </Group>
-          </Badge>
-        </Group>
+              )}
+            </div>
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              boxShadow: 'var(--shadow-colored)',
+            }}>
+              <Group gap={8}>
+                <IconCheck size={24} stroke={2.5} style={{ color: 'white' }} />
+                <div>
+                  <Text fw={700} size="xl" c="white">{submissions.length}</Text>
+                  <Text size="sm" c="white" style={{ opacity: 0.95 }}>
+                    {submissions.length === 1 ? 'Response' : 'Responses'}
+                  </Text>
+                </div>
+              </Group>
+            </div>
+          </Group>
+        </Card>
 
         {/* Responses List */}
         {submissions.length === 0 ? (
@@ -194,13 +211,13 @@ function FormResponses() {
                   width: 80,
                   height: 80,
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--mantine-color-gray-1) 0%, var(--mantine-color-gray-2) 100%)',
+                  backgroundColor: theme.colors.slate[2],
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
               >
-                <IconFileText size={40} stroke={1.5} style={{ color: 'var(--mantine-color-gray-6)' }} />
+                <IconFileText size={40} stroke={1.5} style={{ color: theme.colors.slate[3] }} />
               </Box>
               <Title order={3}>No responses yet</Title>
               <Text c="dimmed" ta="center" maw={400}>
@@ -240,8 +257,8 @@ function FormResponses() {
                 radius="md" 
                 withBorder
                 style={{ 
-                  backgroundColor: 'var(--mantine-color-gray-0)',
-                  borderLeft: '4px solid var(--mantine-color-indigo-6)'
+                  backgroundColor: theme.colors.slate[0],
+                  borderLeft: `4px solid ${theme.colors.indigo[5]}`
                 }}
               >
                 <Stack gap="sm">
@@ -259,7 +276,7 @@ function FormResponses() {
                       </Badge>
                       <div>
                         <Group gap={4} align="center">
-                          <IconClock size={14} style={{ color: 'var(--mantine-color-gray-6)' }} />
+                          <IconClock size={14} style={{ color: theme.colors.slate[5] }} />
                           <Text size="sm" fw={500}>
                             {/* Parse UTC datetime from backend and display in local timezone */}
                             {new Date(submission.completed_at).toLocaleDateString(undefined, { 
@@ -278,7 +295,7 @@ function FormResponses() {
                       </div>
                     </Group>
                     <Group gap="xs">
-                      <Badge color="green" variant="light" size="sm" radius="md">
+                      <Badge color="emerald" variant="light" size="sm" radius="md">
                         Completed
                       </Badge>
                       <ActionIcon
@@ -319,14 +336,14 @@ function FormResponses() {
                                 <Text size="sm" fw={600} style={{ flex: 1, minWidth: 0 }} truncate>
                                   {response.label}
                                 </Text>
-                                <Badge variant="dot" size="xs" color="blue" radius="md">
+                                <Badge variant="dot" size="xs" color="cyan" radius="md">
                                   {response.field_type}
                                 </Badge>
                               </Group>
                               
                               {/* Show attachment if exists */}
                               {hasAttachment && (
-                                <Paper p="xs" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                                <Paper p="xs" withBorder>
                                   <Group gap="xs" mb="xs">
                                     {attachment.type === 'image' && <IconPhoto size={14} />}
                                     {attachment.type === 'video' && <IconVideo size={14} />}
@@ -391,7 +408,7 @@ function FormResponses() {
                                     View Uploaded File
                                   </Button>
                                 ) : (
-                                  <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-indigo-0)' }}>
+                                  <Paper p="sm" withBorder style={{ backgroundColor: theme.colors.indigo[0] }}>
                                     <Text 
                                       size="sm" 
                                       fw={500}
@@ -405,7 +422,7 @@ function FormResponses() {
                                   </Paper>
                                 )
                               ) : (
-                                <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                                <Paper p="sm" withBorder>
                                   <Text 
                                     size="sm" 
                                     c="dimmed"
@@ -432,7 +449,7 @@ function FormResponses() {
                         Session: {submission.session_id.substring(0, 16)}...
                       </Text>
                     </Tooltip>
-                    <Badge variant="light" size="xs" color="gray" radius="md">
+                    <Badge variant="light" size="xs" color="slate" radius="md">
                       {Object.keys(submission.responses).length} {Object.keys(submission.responses).length === 1 ? 'field' : 'fields'}
                     </Badge>
                   </Group>
@@ -472,7 +489,7 @@ function FormResponses() {
               Are you sure you want to delete this response?
             </Text>
             {submissionToDelete && (
-              <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+              <Paper p="sm" withBorder>
                 <Text size="sm" fw={500} mb="xs">Response Details:</Text>
                 <Text size="xs" c="dimmed">
                   Submitted: {new Date(submissionToDelete.completed_at).toLocaleString()}

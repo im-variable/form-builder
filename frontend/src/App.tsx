@@ -8,7 +8,15 @@ import FormResponses from './pages/FormResponses'
 
 function App() {
   return (
-    <AppShell padding="md">
+    <AppShell
+      padding="md"
+      styles={(theme) => ({
+        main: {
+          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #eef2ff 100%)',
+          minHeight: '100vh',
+        },
+      })}
+    >
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/form/:formId" element={<FormView />} />

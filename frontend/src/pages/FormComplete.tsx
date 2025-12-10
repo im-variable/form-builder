@@ -7,34 +7,57 @@ function FormComplete() {
 
   return (
     <Container size="sm" py="xl">
-      <Card shadow="md" padding="xl" radius="md" withBorder>
-        <Stack align="center" gap="lg">
+      <Card shadow="lg" padding="xl" radius="xl" withBorder style={{ 
+        maxWidth: '500px',
+        margin: '0 auto',
+      }}>
+        <Stack align="center" gap="xl">
           <div style={{ 
-            width: 80, 
-            height: 80, 
+            width: 120, 
+            height: 120, 
             borderRadius: '50%', 
-            background: 'var(--mantine-color-green-1)',
+            background: 'linear-gradient(135deg, #eef2ff 0%, #ede9fe 100%)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)',
+            position: 'relative',
           }}>
-            <IconCheck size={48} stroke={2} style={{ color: 'var(--mantine-color-green-6)' }} />
+            <IconCheck size={64} stroke={3} style={{ color: '#6366f1' }} />
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 100%)',
+              pointerEvents: 'none',
+            }} />
           </div>
           <div style={{ textAlign: 'center' }}>
-            <Title order={2} mb="xs">Form Completed!</Title>
-            <Text c="dimmed">
+            <Title order={2} mb="md" style={{ 
+              letterSpacing: '-0.02em',
+              fontWeight: 700,
+            }}>
+              Form Completed!
+            </Title>
+            <Text c="dimmed" size="md" style={{ 
+              lineHeight: 1.7,
+              color: '#64748b',
+            }}>
               Thank you for completing the form. Your responses have been saved.
             </Text>
           </div>
-          <Stack gap="sm" style={{ width: '100%' }}>
+          <Stack gap="sm" style={{ width: '100%', marginTop: '0.5rem' }}>
             <Button
               component={Link}
               to="/"
               fullWidth
-              size="md"
-              leftSection={<IconHome size={18} />}
-              variant="gradient"
-              gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
+              size="lg"
+              leftSection={<IconHome size={20} />}
+              color="indigo"
+              style={{ 
+                padding: '0.875rem 1.5rem',
+                fontWeight: 600,
+              }}
             >
               Back to Home
             </Button>
@@ -45,6 +68,7 @@ function FormComplete() {
                 fullWidth
                 size="md"
                 variant="light"
+                color="violet"
                 leftSection={<IconRefresh size={18} />}
               >
                 Fill Again

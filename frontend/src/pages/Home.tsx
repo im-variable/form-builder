@@ -58,25 +58,52 @@ function Home() {
   return (
     <Container size="xl" py="xl">
       {/* Hero Section */}
-      <Stack align="center" gap="lg" mb="xl">
-        <IconFileText size={64} stroke={1.5} style={{ color: 'var(--mantine-color-indigo-6)' }} />
-        <Title order={1} size="3.5rem" fw={800} ta="center">
-          Dynamic Form Engine
-        </Title>
-        <Text size="xl" c="dimmed" ta="center" maw={600}>
-          Create and fill out dynamic, multi-page forms with conditional logic and intelligent navigation
-        </Text>
-        <Button
-          component={Link}
-          to="/builder"
-          size="lg"
-          leftSection={<IconPlus size={20} />}
-          variant="gradient"
-          gradient={{ from: 'indigo', to: 'purple', deg: 90 }}
-        >
-          Create New Form
-        </Button>
-      </Stack>
+      <Card shadow="lg" padding="xl" radius="xl" withBorder mb="xl">
+        <Stack align="center" gap="xl">
+          <div style={{
+            width: '96px',
+            height: '96px',
+            borderRadius: '24px',
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'var(--shadow-colored)',
+          }}>
+            <IconFileText size={48} stroke={2.5} style={{ color: 'white' }} />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <Title order={1} size="3.5rem" fw={800} ta="center" style={{ 
+              color: '#334155',
+              letterSpacing: '-0.03em',
+              marginBottom: '1rem',
+            }}>
+              Dynamic Form Engine
+            </Title>
+            <Text size="lg" c="dimmed" ta="center" maw={600} style={{ 
+              lineHeight: 1.7,
+              fontSize: '1.125rem',
+              color: '#64748b',
+            }}>
+              Create and fill out dynamic, multi-page forms with conditional logic and intelligent navigation
+            </Text>
+          </div>
+          <Button
+            component={Link}
+            to="/builder"
+            size="lg"
+            leftSection={<IconPlus size={22} />}
+            color="indigo"
+            style={{ 
+              padding: '0.875rem 2rem',
+              fontSize: '1rem',
+              marginTop: '0.5rem',
+            }}
+          >
+            Create New Form
+          </Button>
+        </Stack>
+      </Card>
 
       {loading && (
         <Stack align="center" py="xl">
@@ -98,11 +125,16 @@ function Home() {
 
       {!loading && !error && (
         <Stack gap="xl">
-          <Title order={2}>Available Forms</Title>
+          <div>
+            <Title order={2} mb="xs" style={{ letterSpacing: '-0.02em' }}>Available Forms</Title>
+            <Text size="sm" c="dimmed">Manage and access all your dynamic forms</Text>
+          </div>
           {forms.length === 0 ? (
-            <Card shadow="md" padding="xl" radius="md" withBorder>
+            <Card shadow="md" padding="xl" radius="lg" withBorder style={{ 
+              borderStyle: 'dashed',
+            }}>
               <Stack align="center" gap="md">
-                <IconFileText size={48} stroke={1.5} style={{ color: 'var(--mantine-color-gray-4)' }} />
+                <IconFileText size={48} stroke={1.5} style={{ color: '#cbd5e1' }} />
                 <Title order={3}>No forms available yet</Title>
                 <Text c="dimmed" ta="center">
                   Get started by creating your first dynamic form
@@ -112,6 +144,7 @@ function Home() {
                   to="/builder"
                   leftSection={<IconPlus size={18} />}
                   variant="light"
+                  color="indigo"
                 >
                   Create your first form
                 </Button>
@@ -124,19 +157,48 @@ function Home() {
                   <Card
                     shadow="sm"
                     padding="lg"
-                    radius="md"
+                    radius="lg"
                     withBorder
                     className="hover-card"
+                    style={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
                   >
-                    <Stack gap="md">
+                    <Stack gap="md" style={{ flex: 1 }}>
                       <Group justify="space-between" align="flex-start">
-                        <IconFileText size={32} stroke={1.5} style={{ color: 'var(--mantine-color-indigo-6)' }} />
-                        <Badge color="green" variant="light">Active</Badge>
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: 'var(--shadow-sm)',
+                        }}>
+                          <IconFileText size={28} stroke={2} style={{ color: 'white' }} />
+                        </div>
+                        <Badge color="indigo" variant="light" size="sm" radius="md" style={{ 
+                          fontWeight: 600,
+                          letterSpacing: '0.02em',
+                        }}>
+                          Active
+                        </Badge>
                       </Group>
-                      <div>
-                        <Title order={4} mb="xs">{form.title}</Title>
+                      <div style={{ flex: 1 }}>
+                        <Title order={4} mb="xs" style={{ 
+                          letterSpacing: '-0.01em',
+                          fontWeight: 600,
+                        }}>
+                          {form.title}
+                        </Title>
                         {form.description && (
-                          <Text size="sm" c="dimmed" lineClamp={2}>
+                          <Text size="sm" c="dimmed" lineClamp={2} style={{ 
+                            lineHeight: 1.6,
+                            color: '#64748b',
+                          }}>
                             {form.description}
                           </Text>
                         )}
