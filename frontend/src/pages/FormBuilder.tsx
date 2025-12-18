@@ -30,7 +30,7 @@ import {
   Image,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter, IconUpload, IconX, IconPhoto, IconVideo, IconMusic, IconFileText } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconPin, IconRoute, IconPlayerPlay, IconFilter, IconUpload, IconX, IconFileText } from '@tabler/icons-react'
 import { builderAPI, uploadAPI, Form, Page, Field } from '../services/api'
 import { ParagraphFieldAutocomplete } from '../components/ParagraphFieldAutocomplete'
 import { convertFieldIdsToNames, convertFieldNamesToIds } from '../utils/fieldReferenceConverter'
@@ -128,13 +128,12 @@ function FormBuilder() {
   const [conditionToDelete, setConditionToDelete] = useState<number | null>(null)
   
   // Preview modal state
-  const [previewModalOpened, { open: openPreviewModal, close: closePreviewModal }] = useDisclosure(false)
+  const [previewModalOpened, { close: closePreviewModal }] = useDisclosure(false)
   
   // Navigation rules state
   const [navigationRulesModalOpened, { open: openNavigationRulesModal, close: closeNavigationRulesModal }] = useDisclosure(false)
   const [selectedPageForRules, setSelectedPageForRules] = useState<Page | null>(null)
   const [navigationRules, setNavigationRules] = useState<any[]>([])
-  const [editingRuleId, setEditingRuleId] = useState<number | null>(null)
   
   // Navigation rule form state
   const [ruleSourceFieldId, setRuleSourceFieldId] = useState<string>('')
@@ -266,7 +265,7 @@ function FormBuilder() {
       
       if (editingPageId) {
         // Update existing page
-        const updatedPage = await builderAPI.updatePage(editingPageId, {
+        await builderAPI.updatePage(editingPageId, {
           title: pageTitle,
           description: pageDescription || undefined,
           is_first: isFirstPage,
@@ -493,7 +492,6 @@ function FormBuilder() {
       setRuleValue('')
       setRuleTargetPageId('')
       setRuleIsDefault(false)
-      setEditingRuleId(null)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to create navigation rule')
     } finally {
@@ -1452,7 +1450,7 @@ function FormBuilder() {
             </Group>
             {pages.length === 0 ? (
               <Stack gap="sm" align="center" py="md">
-                <Alert icon={<IconAlertCircle size={18} />} title="No Pages Available" color="yellow" size="sm">
+                <Alert icon={<IconAlertCircle size={18} />} title="No Pages Available" color="yellow">
                   You need to create at least one page before adding fields.
                 </Alert>
                 <Button
@@ -1467,7 +1465,7 @@ function FormBuilder() {
               </Stack>
             ) : !currentPage ? (
               <Stack gap="sm">
-                <Alert icon={<IconAlertCircle size={18} />} title="Select a Page" color="blue" size="sm">
+                <Alert icon={<IconAlertCircle size={18} />} title="Select a Page" color="blue">
                   Please select a page to add fields to.
                 </Alert>
                 <Select
@@ -2291,7 +2289,6 @@ function FormBuilder() {
             setRuleValue('')
             setRuleTargetPageId('')
             setRuleIsDefault(false)
-            setEditingRuleId(null)
           }}
           title={`Navigation Rules: ${selectedPageForRules?.title || ''}`}
           size="xl"
@@ -2660,7 +2657,7 @@ function FormBuilder() {
                 <Text size="sm">{pageToDelete.title}</Text>
               </Paper>
             )}
-            <Alert icon={<IconAlertCircle size={16} />} color="red" size="sm">
+            <Alert icon={<IconAlertCircle size={16} />} color="red">
               <Text size="sm" fw={500} mb={4}>Warning:</Text>
               <Text size="sm">All fields in this page will also be deleted. This action cannot be undone.</Text>
             </Alert>

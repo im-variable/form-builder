@@ -112,7 +112,6 @@ function FormView() {
         allAnswersFromBackend = await formAPI.getSubmissionResponses(newSessionId) || {}
       } catch (err: any) {
         // If 404 or other error, just use empty object (submission might not have responses yet)
-        console.warn('Could not fetch submission responses:', err)
         allAnswersFromBackend = {}
       }
       
@@ -202,7 +201,6 @@ function FormView() {
         allAnswersFromBackend = await formAPI.getSubmissionResponses(sessionId) || {}
       } catch (err: any) {
         // If error, just use empty object
-        console.warn('Could not fetch submission responses:', err)
         allAnswersFromBackend = {}
       }
       
@@ -312,7 +310,6 @@ function FormView() {
       try {
         backendAnswersForSubmit = await formAPI.getSubmissionResponses(sessionId) || {}
       } catch (err: any) {
-        console.warn('Could not fetch submission responses before submit:', err)
         backendAnswersForSubmit = {}
       }
       
@@ -384,7 +381,6 @@ function FormView() {
         allAnswersAfterSubmit = await formAPI.getSubmissionResponses(sessionId) || {}
       } catch (err: any) {
         // If error, just use empty object
-        console.warn('Could not fetch submission responses:', err)
         allAnswersAfterSubmit = {}
       }
       
