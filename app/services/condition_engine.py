@@ -99,14 +99,14 @@ class ConditionEngine:
             }
         else:
             # Default: visible (for hide conditions or no visibility conditions)
-        result = {
-            "show": True,
-            "hide": False,
-            "enable": True,
-            "disable": False,
-            "require": False,
-            "skip": False
-        }
+            result = {
+                "show": True,
+                "hide": False,
+                "enable": True,
+                "disable": False,
+                "require": False,
+                "skip": False
+            }
 
         # Evaluate all conditions - if ANY condition is met, apply its action
         for condition in conditions:

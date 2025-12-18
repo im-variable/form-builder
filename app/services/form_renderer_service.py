@@ -494,7 +494,7 @@ class FormRendererService:
             db.commit()
             db.refresh(submission)
                 
-                return FormRenderResponse(
+            return FormRenderResponse(
                     form_id=form_id,
                     form_title=form.title,
             current_page=rendered_page,
@@ -701,7 +701,7 @@ class FormRendererService:
         if submission.current_page_id != page.id:
             submission.current_page_id = page.id
         db.commit()
-            db.refresh(submission)
+        db.refresh(submission)
 
         return FormRenderResponse(
             form_id=form_id,
