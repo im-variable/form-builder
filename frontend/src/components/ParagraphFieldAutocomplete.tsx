@@ -206,30 +206,44 @@ export function ParagraphFieldAutocomplete({
     if (e.key === 'Delete' && cursorPos < text.length) {
       // Check if we're right before a @ symbol
       if (text[cursorPos] === '@') {
-        // Find where this field reference ends
+        // Find where this field reference ends (stop at double space, newline, @, or end)
         let endIndex = cursorPos + 1
         while (endIndex < text.length) {
           const char = text[endIndex]
-          if (char === ' ' || char === '\n' || char === '@') {
+          const nextChar = endIndex + 1 < text.length ? text[endIndex + 1] : ''
+          
+          // Stop at newline, @, or double space
+          if (char === '\n' || char === '@' || (char === ' ' && nextChar === ' ')) {
             break
           }
           endIndex++
         }
         
-        // Delete the entire field reference
-        e.preventDefault()
-        const before = text.substring(0, cursorPos)
-        const after = text.substring(endIndex)
-        onChange(before + after)
+        // Check if the extracted text matches a known field name
+        const potentialFieldName = text.substring(cursorPos + 1, endIndex).trimEnd()
+        const matchingField = allFields.find(f => {
+          const nameLower = f.name.toLowerCase()
+          const potentialLower = potentialFieldName.toLowerCase()
+          return nameLower === potentialLower
+        })
         
-        // Set cursor position after deletion
-        setTimeout(() => {
-          if (textareaRef.current) {
-            textareaRef.current.setSelectionRange(cursorPos, cursorPos)
-            textareaRef.current.focus()
-          }
-        }, 0)
-        return
+        // Only delete if it matches a known field name
+        if (matchingField) {
+          // Delete the entire field reference
+          e.preventDefault()
+          const before = text.substring(0, cursorPos)
+          const after = text.substring(endIndex)
+          onChange(before + after)
+          
+          // Set cursor position after deletion
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.setSelectionRange(cursorPos, cursorPos)
+              textareaRef.current.focus()
+            }
+          }, 0)
+          return
+        }
       }
     }
     
@@ -290,25 +304,6 @@ export function ParagraphFieldAutocomplete({
     }
   }, [value, showSuggestions])
 
-  // Sync textarea height with preview layer
-  useEffect(() => {
-    if (textareaRef.current && previewRef.current) {
-      const textarea = textareaRef.current
-      const preview = previewRef.current
-      
-      // Sync scroll position
-      const syncScroll = () => {
-        preview.scrollTop = textarea.scrollTop
-        preview.scrollLeft = textarea.scrollLeft
-      }
-      
-      textarea.addEventListener('scroll', syncScroll)
-      
-      return () => {
-        textarea.removeEventListener('scroll', syncScroll)
-      }
-    }
-  }, [value])
 
   // Parse text and create styled parts
   const parseTextWithFieldReferences = () => {
@@ -501,8 +496,6 @@ export function ParagraphFieldAutocomplete({
                         display: 'inline',
                         fontFamily: 'inherit',
                         letterSpacing: 'inherit',
-                        textShadow: '0 0 0 #6366f1',
-                        WebkitTextFillColor: '#6366f1',
                       }}
                     >
                       @{part.fieldName}
