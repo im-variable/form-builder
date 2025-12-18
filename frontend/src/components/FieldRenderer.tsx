@@ -1,7 +1,8 @@
 import { TextInput, Textarea, NumberInput, Select, Radio, Checkbox, Switch, Rating, Stack, Text, FileButton, Button, Group, Image, Paper } from '@mantine/core'
 import { IconUpload, IconX, IconPhoto, IconVideo, IconMusic } from '@tabler/icons-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { uploadAPI, Field } from '../services/api'
+import { convertUTCToLocal, convertLocalToUTC } from '../utils/datetimeUtils'
 
 interface FieldRendererProps {
   field: Field
@@ -168,11 +169,27 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
         )
 
       case 'datetime':
+        // Convert UTC to local for display, and local to UTC when sending
+        const displayValue = value ? (value.includes('T') && value.includes('Z') || value.includes('+') 
+          ? convertUTCToLocal(value) 
+          : value) : ''
+        
+        const handleDateTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const localValue = e.target.value
+          if (localValue) {
+            // Convert local datetime to UTC before sending
+            const utcValue = convertLocalToUTC(localValue)
+            onChange(utcValue)
+          } else {
+            onChange('')
+          }
+        }
+        
         return (
           <TextInput
             type="datetime-local"
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
+            value={displayValue}
+            onChange={handleDateTimeChange}
             required={field.is_required}
             size="md"
           />

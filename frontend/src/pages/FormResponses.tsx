@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { formatUTCDate, formatUTCTime, formatUTCDateTime } from '../utils/datetimeUtils'
 import {
   Container,
   Card,
@@ -279,14 +280,14 @@ function FormResponses() {
                           <IconClock size={14} style={{ color: theme.colors.slate[5] }} />
                           <Text size="sm" fw={500}>
                             {/* Parse UTC datetime from backend and display in local timezone */}
-                            {new Date(submission.completed_at).toLocaleDateString(undefined, { 
+                            {formatUTCDate(submission.completed_at, { 
                               month: 'short', 
                               day: 'numeric', 
                               year: 'numeric'
                             })}
                           </Text>
                           <Text size="sm" c="dimmed">
-                            at {new Date(submission.completed_at).toLocaleTimeString(undefined, { 
+                            at {formatUTCTime(submission.completed_at, { 
                               hour: '2-digit', 
                               minute: '2-digit'
                             })}
@@ -492,7 +493,7 @@ function FormResponses() {
               <Paper p="sm" withBorder>
                 <Text size="sm" fw={500} mb="xs">Response Details:</Text>
                 <Text size="xs" c="dimmed">
-                  Submitted: {new Date(submissionToDelete.completed_at).toLocaleString()}
+                  Submitted: {formatUTCDateTime(submissionToDelete.completed_at)}
                 </Text>
                 <Text size="xs" c="dimmed">
                   Fields: {Object.keys(submissionToDelete.responses).length}

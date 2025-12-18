@@ -49,7 +49,13 @@ def submit_answer(answer_data: SubmitAnswerRequest, db: Session = Depends(get_db
 
 @router.get("/form/{form_id}/submissions")
 def get_form_submissions(form_id: int, db: Session = Depends(get_db)):
-    """Get all completed submissions for a form"""
+    """
+    Get all completed submissions for a form.
+    Returns datetimes in UTC - frontend will convert to local timezone.
+    
+    Args:
+        form_id: Form ID
+    """
     submissions = SubmissionService.get_form_submissions(db, form_id)
     return {"form_id": form_id, "submissions": submissions}
 

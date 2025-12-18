@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import FieldType, ConditionOperator, ConditionAction
 
 
@@ -25,6 +25,19 @@ class FormResponse(FormBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        """Ensure datetime is timezone-aware (UTC)"""
+        if v is None:
+            return v
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                # Assume naive datetime is UTC
+                return v.replace(tzinfo=timezone.utc)
+            return v
+        return v
 
     class Config:
         from_attributes = True
@@ -156,6 +169,19 @@ class SubmissionResponse(BaseModel):
     value: Optional[str] = None
     created_at: datetime
 
+    @field_validator('created_at', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        """Ensure datetime is timezone-aware (UTC)"""
+        if v is None:
+            return v
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                # Assume naive datetime is UTC
+                return v.replace(tzinfo=timezone.utc)
+            return v
+        return v
+
     class Config:
         from_attributes = True
 
@@ -168,6 +194,19 @@ class SubmissionStatus(BaseModel):
     current_page_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        """Ensure datetime is timezone-aware (UTC)"""
+        if v is None:
+            return v
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                # Assume naive datetime is UTC
+                return v.replace(tzinfo=timezone.utc)
+            return v
+        return v
 
     class Config:
         from_attributes = True

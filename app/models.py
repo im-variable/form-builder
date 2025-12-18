@@ -1,8 +1,44 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, ForeignKey, JSON, Float, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, Text, ForeignKey, JSON, Float, DateTime, Enum as SQLEnum, TypeDecorator
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from datetime import datetime, timezone
 import enum
+
+
+def utc_now():
+    """Return current UTC datetime with timezone"""
+    return datetime.now(timezone.utc)
+
+
+class UTCDateTime(TypeDecorator):
+    """A DateTime type that ensures timezone-aware UTC datetimes"""
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        """Convert datetime to UTC timezone-aware before storing"""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                # Assume naive datetime is UTC
+                return value.replace(tzinfo=timezone.utc)
+            # Convert to UTC if not already
+            return value.astimezone(timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        """Ensure datetime is timezone-aware UTC when loading from database"""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                # Assume naive datetime is UTC
+                return value.replace(tzinfo=timezone.utc)
+            # Ensure it's UTC
+            return value.astimezone(timezone.utc)
+        return value
 
 
 class FieldType(str, enum.Enum):
@@ -57,8 +93,8 @@ class Form(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(UTCDateTime, default=utc_now)
+    updated_at = Column(UTCDateTime, default=utc_now, onupdate=utc_now)
 
     pages = relationship("Page", back_populates="form", cascade="all, delete-orphan", order_by="Page.order")
     submissions = relationship("Submission", back_populates="form", cascade="all, delete-orphan")
@@ -142,9 +178,9 @@ class Submission(Base):
     session_id = Column(String(255), nullable=False, index=True)  # Unique session identifier
     status = Column(String(50), default="in_progress")  # in_progress, completed, abandoned
     current_page_id = Column(Integer, ForeignKey("pages.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(UTCDateTime, default=utc_now)
+    updated_at = Column(UTCDateTime, default=utc_now, onupdate=utc_now)
+    completed_at = Column(UTCDateTime, nullable=True)
 
     form = relationship("Form", back_populates="submissions")
     current_page = relationship("Page")
@@ -158,8 +194,8 @@ class FieldResponse(Base):
     submission_id = Column(Integer, ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False)
     field_id = Column(Integer, ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
     value = Column(Text, nullable=True)  # Store as text, parse based on field type
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(UTCDateTime, default=utc_now)
+    updated_at = Column(UTCDateTime, default=utc_now, onupdate=utc_now)
 
     submission = relationship("Submission", back_populates="responses")
     field = relationship("Field", back_populates="responses")

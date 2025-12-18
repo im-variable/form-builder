@@ -4,6 +4,7 @@ Handles storing responses and managing form submissions
 """
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional, Dict, Any
+from datetime import datetime, timezone
 from app.models import Submission, FieldResponse, Field, Page
 from app.schemas import SubmitAnswerResponse
 from app.services.condition_engine import ConditionEngine
@@ -126,7 +127,17 @@ class SubmissionService:
 
     @staticmethod
     def get_form_submissions(db: Session, form_id: int):
-        """Get all completed submissions for a form"""
+        """
+        Get all completed submissions for a form.
+        Returns datetimes in UTC - frontend will convert to local timezone.
+        
+        Args:
+            db: Database session
+            form_id: Form ID
+        
+        Returns:
+            List of submission dictionaries with datetimes in UTC
+        """
         submissions = db.query(Submission).options(
             joinedload(Submission.responses).joinedload(FieldResponse.field)
         ).filter(
@@ -147,13 +158,17 @@ class SubmissionService:
                     "options": field.options  # Include options for attachments
                 }
             
+            # Return UTC datetimes as ISO strings - frontend will convert to local timezone
+            created_at_str = submission.created_at.isoformat() if submission.created_at else None
+            completed_at_str = submission.completed_at.isoformat() if submission.completed_at else None
+            
             result.append({
                 "id": submission.id,
                 "session_id": submission.session_id,
                 "status": submission.status,
-                # Store in UTC, frontend will convert to local timezone
-                "created_at": submission.created_at.isoformat() if submission.created_at else None,
-                "completed_at": submission.completed_at.isoformat() if submission.completed_at else None,
+                # Datetimes in UTC - frontend converts to local timezone
+                "created_at": created_at_str,
+                "completed_at": completed_at_str,
                 "responses": responses_dict
             })
         

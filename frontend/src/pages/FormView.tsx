@@ -18,6 +18,7 @@ import { formAPI, FormRenderResponse, SubmitAnswerRequest, Field } from '../serv
 import FieldRenderer from '../components/FieldRenderer'
 import { evaluateFieldConditions } from '../utils/conditionEvaluator'
 import { replaceFieldReferences } from '../utils/fieldReferenceReplacer'
+import { convertUTCToLocal } from '../utils/datetimeUtils'
 
 function FormView() {
   const theme = useMantineTheme()
@@ -121,11 +122,13 @@ function FormView() {
         Object.keys(allAnswersFromBackend).forEach((fieldName) => {
           const responseData = allAnswersFromBackend[fieldName]
           // Handle both formats: simple value or object with value property
+          let value: any
           if (responseData && typeof responseData === 'object' && 'value' in responseData) {
-            answersDict[fieldName] = responseData.value
+            value = responseData.value
           } else {
-            answersDict[fieldName] = responseData
+            value = responseData
           }
+          answersDict[fieldName] = value
         })
       }
       
@@ -136,13 +139,27 @@ function FormView() {
       const initialRequired: Record<number, boolean> = {}
       
       data.current_page.fields.forEach((field) => {
+        let fieldValue: any
+        
         // Use current_value from field if available, otherwise use value from allAnswersFromBackend
         if (field.current_value !== undefined && field.current_value !== null && field.current_value !== '') {
-          initialAnswers[field.name] = field.current_value
-        } else if (!(field.name in initialAnswers)) {
+          fieldValue = field.current_value
+        } else if (field.name in initialAnswers) {
+          fieldValue = initialAnswers[field.name]
+        } else {
           // Initialize empty fields as empty string so IS_EMPTY conditions can evaluate
-          initialAnswers[field.name] = ""
+          fieldValue = ""
         }
+        
+        // Convert UTC datetime to local timezone for datetime fields
+        if (field.field_type === 'datetime' && fieldValue && typeof fieldValue === 'string') {
+          // Check if it's a UTC datetime string (contains 'Z' or timezone offset)
+          if (fieldValue.includes('T') && (fieldValue.includes('Z') || fieldValue.includes('+'))) {
+            fieldValue = convertUTCToLocal(fieldValue)
+          }
+        }
+        
+        initialAnswers[field.name] = fieldValue
         
         // Initialize visibility and required from backend (conditions already evaluated)
         initialVisibility[field.id] = field.is_visible

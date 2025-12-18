@@ -4,6 +4,7 @@ import { Container, Title, Text, Button, Card, Grid, Stack, Loader, Alert, Group
 import { useDisclosure } from '@mantine/hooks'
 import { IconFileText, IconPlus, IconCalendar, IconArrowRight, IconAlertCircle, IconEdit, IconTrash, IconList } from '@tabler/icons-react'
 import { formAPI, builderAPI, Form } from '../services/api'
+import { formatUTCDate } from '../utils/datetimeUtils'
 
 function Home() {
   const [forms, setForms] = useState<Form[]>([])
@@ -207,7 +208,7 @@ function Home() {
                         <Group gap={4}>
                           <IconCalendar size={14} />
                           <Text size="xs" c="dimmed">
-                            {new Date(form.created_at).toLocaleDateString()}
+                            {formatUTCDate(form.created_at)}
                           </Text>
                         </Group>
                       </Group>
