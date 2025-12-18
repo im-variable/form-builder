@@ -23,6 +23,7 @@ class FieldType(str, enum.Enum):
     VIDEO = "video"
     AUDIO = "audio"
     RATING = "rating"
+    PARAGRAPH = "paragraph"
 
 
 class ConditionOperator(str, enum.Enum):

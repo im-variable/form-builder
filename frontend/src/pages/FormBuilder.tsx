@@ -32,6 +32,7 @@ import {
 import { useDisclosure } from '@mantine/hooks'
 import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter, IconUpload, IconX, IconPhoto, IconVideo, IconMusic } from '@tabler/icons-react'
 import { builderAPI, uploadAPI, Form, Page, Field } from '../services/api'
+import { ParagraphFieldAutocomplete } from '../components/ParagraphFieldAutocomplete'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
@@ -47,6 +48,7 @@ const FIELD_TYPES = [
   { value: 'boolean', label: 'Boolean' },
   { value: 'file', label: 'File' },
   { value: 'rating', label: 'Rating' },
+  { value: 'paragraph', label: 'Paragraph' },
 ]
 
 function FormBuilder() {
@@ -58,6 +60,7 @@ function FormBuilder() {
   const [pages, setPages] = useState<Page[]>([])
   const [currentPage, setCurrentPage] = useState<Page | null>(null)
   const [fields, setFields] = useState<Field[]>([])
+  const [allFields, setAllFields] = useState<Array<Field & { pageTitle?: string }>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -88,6 +91,9 @@ function FormBuilder() {
   // Rating configuration
   const [ratingMin, setRatingMin] = useState(1)
   const [ratingMax, setRatingMax] = useState(5)
+
+  // Paragraph content (stored in default_value)
+  const [paragraphContent, setParagraphContent] = useState('')
 
   // Attachment state (for any field type)
   const [attachmentType, setAttachmentType] = useState<'image' | 'video' | 'audio' | 'file' | ''>('')
@@ -318,8 +324,35 @@ function FormBuilder() {
         return (a.order || 0) - (b.order || 0)
       })
       setPages(sortedPages)
+      
+      // Load all fields from all pages for autocomplete
+      await loadAllFields(sortedPages)
     } catch (err: any) {
       console.error('Error loading pages:', err)
+    }
+  }
+
+  const loadAllFields = async (pagesList: Page[]) => {
+    if (!currentForm) return
+    try {
+      const fieldsWithPages: Array<Field & { pageTitle?: string }> = []
+      
+      for (const page of pagesList) {
+        try {
+          const pageFields = await builderAPI.getFields(page.id)
+          const fieldsWithPageInfo = pageFields.map((field) => ({
+            ...field,
+            pageTitle: page.title,
+          }))
+          fieldsWithPages.push(...fieldsWithPageInfo)
+        } catch (err) {
+          console.error(`Error loading fields for page ${page.id}:`, err)
+        }
+      }
+      
+      setAllFields(fieldsWithPages)
+    } catch (err: any) {
+      console.error('Error loading all fields:', err)
     }
   }
 
@@ -723,6 +756,9 @@ function FormBuilder() {
       setRatingMin(1)
       setRatingMax(5)
     }
+    if (newType !== 'paragraph') {
+      setParagraphContent('')
+    }
     // Note: Attachment is independent of field type, so we don't reset it here
   }
 
@@ -824,6 +860,7 @@ function FormBuilder() {
     setNewChoiceLabel('')
     setRatingMin(1)
     setRatingMax(5)
+    setParagraphContent('')
     setAttachmentType('')
     setAttachmentFileUrl('')
     setAttachmentUrlInput('')
@@ -846,6 +883,10 @@ function FormBuilder() {
       setFields(fields.filter(f => f.id !== fieldToDelete.id))
       if (editingFieldId === fieldToDelete.id) {
         handleCancelEdit()
+      }
+      // Reload all fields for autocomplete
+      if (pages.length > 0) {
+        await loadAllFields(pages)
       }
       closeDeleteFieldModal()
       setFieldToDelete(null)
@@ -909,6 +950,11 @@ function FormBuilder() {
       return
     }
 
+    if (fieldType === 'paragraph' && !paragraphContent.trim()) {
+      setError('Paragraph content is required')
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -935,7 +981,7 @@ function FormBuilder() {
 
       if (editingFieldId) {
         // Update existing field
-        const updatedField = await builderAPI.updateField(editingFieldId, {
+        const updateData: any = {
           name: fieldName,
           label: fieldLabel,
           field_type: fieldType,
@@ -944,9 +990,20 @@ function FormBuilder() {
           is_required: fieldRequired,
           is_visible: fieldVisible,
           options: parsedOptions,
-        })
+        }
+        
+        // Add default_value for paragraph fields (required for paragraph type)
+        if (fieldType === 'paragraph') {
+          updateData.default_value = paragraphContent ? paragraphContent.trim() : ''
+        }
+        
+        const updatedField = await builderAPI.updateField(editingFieldId, updateData)
 
         setFields(fields.map(f => f.id === editingFieldId ? updatedField : f))
+        // Reload all fields for autocomplete
+        if (pages.length > 0) {
+          await loadAllFields(pages)
+        }
         handleCancelEdit()
       } else {
         // Create new field
@@ -970,16 +1027,29 @@ function FormBuilder() {
         if (parsedOptions) {
           fieldData.options = parsedOptions
         }
+        // Add default_value for paragraph fields (required for paragraph type)
+        if (fieldType === 'paragraph') {
+          fieldData.default_value = paragraphContent ? paragraphContent.trim() : ''
+        }
         
         console.log('Creating field with data:', fieldData)
         const field = await builderAPI.createField(fieldData)
 
         setFields([...fields, field])
+        // Reload all fields for autocomplete
+        if (pages.length > 0) {
+          await loadAllFields(pages)
+        }
         handleCancelEdit()
       }
     } catch (err: any) {
       console.error('Error creating/updating field:', err)
       console.error('Error response:', err.response?.data)
+      if (editingFieldId) {
+        console.error('Update data:', updateData)
+      } else {
+        console.error('Create data:', fieldData)
+      }
       
       // Handle validation errors (422) - FastAPI returns array of errors
       if (err.response?.status === 422 && err.response?.data?.detail) {
@@ -1708,6 +1778,27 @@ function FormBuilder() {
                     </Group>
                     <Text size="xs" c="dimmed" mt="xs">
                       Rating will be from {ratingMin} to {ratingMax} stars
+                    </Text>
+                  </Paper>
+                )}
+
+                {/* Paragraph content */}
+                {fieldType === 'paragraph' && (
+                  <Paper p="sm" withBorder>
+                    <ParagraphFieldAutocomplete
+                      label="Paragraph Content"
+                      placeholder="Type @ to see field suggestions. Use @fieldname to reference other fields (e.g., Hi @email, your password is @password)"
+                      value={paragraphContent}
+                      onChange={setParagraphContent}
+                      pages={pages}
+                      allFields={allFields}
+                      rows={6}
+                      size="sm"
+                      required
+                    />
+                    <Text size="xs" c="dimmed" mt="xs">
+                      Type <Text component="span" fw={600}>@</Text> to see autocomplete suggestions with field names and page information. 
+                      References can be from the same page or different pages.
                     </Text>
                   </Paper>
                 )}

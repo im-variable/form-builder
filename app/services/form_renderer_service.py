@@ -2,11 +2,75 @@
 Form Renderer Service
 Handles rendering forms and determining next pages based on answers
 """
+import re
 from sqlalchemy.orm import Session, joinedload
 from typing import Dict, Any, Optional, List
-from app.models import Form, Page, Field, Submission, FieldResponse, FieldCondition, PageNavigationRule
+from app.models import Form, Page, Field, Submission, FieldResponse, FieldCondition, PageNavigationRule, FieldType
 from app.schemas import RenderedField, RenderedPage, FormRenderResponse, FieldConditionRule
 from app.services.condition_engine import ConditionEngine
+
+
+def replace_field_references(text: str, answers: Dict[str, Any], db: Session, form_id: int) -> str:
+    """
+    Replace @fieldname placeholders in text with actual field values.
+    
+    Args:
+        text: The text containing @fieldname placeholders
+        answers: Dictionary of field_name -> value
+        db: Database session
+        form_id: Form ID to look up fields from
+    
+    Returns:
+        Text with @fieldname placeholders replaced with actual values
+    """
+    if not text:
+        return text
+    
+    # Find all @fieldname patterns
+    pattern = r'@(\w+)'
+    matches = re.findall(pattern, text)
+    
+    if not matches:
+        return text
+    
+    # Get all fields for this form to validate field names
+    all_fields = db.query(Field).filter(
+        Field.page_id.in_(
+            db.query(Page.id).filter(Page.form_id == form_id)
+        )
+    ).all()
+    
+    field_name_map = {field.name: field for field in all_fields}
+    
+    result = text
+    for field_name in matches:
+        if field_name in field_name_map:
+            field = field_name_map[field_name]
+            # Get the value from answers
+            value = answers.get(field_name)
+            
+            # Format the value based on field type
+            if value is None or value == "":
+                display_value = ""  # Empty if no value
+            elif field.field_type == FieldType.BOOLEAN:
+                display_value = "Yes" if (value == True or value == "true" or str(value).lower() == "true") else "No"
+            elif field.field_type == FieldType.DATE:
+                display_value = str(value)  # Date format as stored
+            elif field.field_type == FieldType.DATETIME:
+                display_value = str(value)  # DateTime format as stored
+            elif isinstance(value, list):
+                display_value = ", ".join(str(v) for v in value)
+            else:
+                display_value = str(value)
+            
+            # Replace all occurrences of @fieldname with the value
+            result = result.replace(f"@{field_name}", display_value)
+        else:
+            # Field name not found, leave placeholder as is or show error
+            # For now, we'll leave it as is
+            pass
+    
+    return result
 
 
 class FormRendererService:
@@ -223,6 +287,27 @@ class FormRendererService:
             # Get current value if exists
             current_value = current_answers.get(field.name)
 
+            # Process paragraph fields: replace @fieldname references with actual values
+            processed_default_value = field.default_value
+            processed_help_text = field.help_text
+            if field.field_type == FieldType.PARAGRAPH:
+                # Process default_value (paragraph content) to replace field references
+                if processed_default_value:
+                    processed_default_value = replace_field_references(
+                        processed_default_value,
+                        condition_evaluation_answers,
+                        db,
+                        form_id
+                    )
+                # Also process help_text if it exists
+                if processed_help_text:
+                    processed_help_text = replace_field_references(
+                        processed_help_text,
+                        condition_evaluation_answers,
+                        db,
+                        form_id
+                    )
+
             # Include conditions for frontend evaluation (only same-page conditions)
             field_conditions = []
             if target_conditions:
@@ -243,10 +328,10 @@ class FormRendererService:
                 label=field.label,
                 field_type=field.field_type,
                 placeholder=field.placeholder,
-                help_text=field.help_text,
+                help_text=processed_help_text,
                 is_required=field.is_required,
                 is_visible=is_visible,
-                default_value=field.default_value,
+                default_value=processed_default_value,
                 options=field.options,
                 validation_rules=field.validation_rules,
                 current_value=current_value,
@@ -417,6 +502,25 @@ class FormRendererService:
                     
                     current_value = db_answers.get(field.name)
                     
+                    # Process paragraph fields: replace @fieldname references with actual values
+                    processed_default_value = field.default_value
+                    processed_help_text = field.help_text
+                    if field.field_type == FieldType.PARAGRAPH:
+                        if processed_default_value:
+                            processed_default_value = replace_field_references(
+                                processed_default_value,
+                                condition_evaluation_answers,
+                                db,
+                                form_id
+                            )
+                        if processed_help_text:
+                            processed_help_text = replace_field_references(
+                                processed_help_text,
+                                condition_evaluation_answers,
+                                db,
+                                form_id
+                            )
+                    
                     field_conditions = []
                     if target_conditions:
                         for condition in target_conditions:
@@ -435,10 +539,10 @@ class FormRendererService:
                         label=field.label,
                         field_type=field.field_type,
                         placeholder=field.placeholder,
-                        help_text=field.help_text,
+                        help_text=processed_help_text,
                         is_required=field.is_required,
                         is_visible=is_visible,
-                        default_value=field.default_value,
+                        default_value=processed_default_value,
                         options=field.options,
                         validation_rules=field.validation_rules,
                         current_value=current_value,
@@ -493,15 +597,16 @@ class FormRendererService:
             submission.completed_at = datetime.now(timezone.utc)
             db.commit()
             db.refresh(submission)
-                
-            return FormRenderResponse(
-                    form_id=form_id,
-                    form_title=form.title,
+        
+        # Return the rendered form response (for both complete and incomplete cases)
+        return FormRenderResponse(
+            form_id=form_id,
+            form_title=form.title,
             current_page=rendered_page,
             next_page_id=next_page_id,
-                    is_complete=is_complete,
-                    progress=round(progress, 2)
-                )
+            is_complete=is_complete,
+            progress=round(progress, 2)
+        )
 
     @staticmethod
     def render_page_for_submission(
@@ -613,6 +718,25 @@ class FormRendererService:
             # Get current value from submission answers
             current_value = db_answers.get(field.name)
             
+            # Process paragraph fields: replace @fieldname references with actual values
+            processed_default_value = field.default_value
+            processed_help_text = field.help_text
+            if field.field_type == FieldType.PARAGRAPH:
+                if processed_default_value:
+                    processed_default_value = replace_field_references(
+                        processed_default_value,
+                        condition_evaluation_answers,
+                        db,
+                        form_id
+                    )
+                if processed_help_text:
+                    processed_help_text = replace_field_references(
+                        processed_help_text,
+                        condition_evaluation_answers,
+                        db,
+                        form_id
+                    )
+            
             # Include conditions for frontend evaluation (only same-page conditions)
             field_conditions = []
             if target_conditions:
@@ -632,10 +756,10 @@ class FormRendererService:
                 label=field.label,
                 field_type=field.field_type,
                 placeholder=field.placeholder,
-                help_text=field.help_text,
+                help_text=processed_help_text,
                 is_required=field.is_required,
                 is_visible=is_visible,
-                default_value=field.default_value,
+                default_value=processed_default_value,
                 options=field.options,
                 validation_rules=field.validation_rules,
                 current_value=current_value,

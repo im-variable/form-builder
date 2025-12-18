@@ -11,13 +11,13 @@ import {
   Group,
   Loader,
   Alert,
-  Paper,
   useMantineTheme,
 } from '@mantine/core'
 import { IconFileText, IconX, IconArrowRight, IconAlertCircle, IconCheck, IconArrowLeft } from '@tabler/icons-react'
 import { formAPI, FormRenderResponse, SubmitAnswerRequest, Field } from '../services/api'
 import FieldRenderer from '../components/FieldRenderer'
 import { evaluateFieldConditions } from '../utils/conditionEvaluator'
+import { replaceFieldReferences } from '../utils/fieldReferenceReplacer'
 
 function FormView() {
   const theme = useMantineTheme()
@@ -399,7 +399,7 @@ function FormView() {
                 })
                 .map((field) => {
                   // Create field with updated visibility and required from local state
-                  const fieldWithLocalState: Field = {
+                  let fieldWithLocalState: Field = {
                     ...field,
                     is_visible: localFieldVisibility[field.id] !== undefined 
                       ? localFieldVisibility[field.id] 
@@ -407,6 +407,21 @@ function FormView() {
                     is_required: localFieldRequired[field.id] !== undefined 
                       ? localFieldRequired[field.id] 
                       : field.is_required
+                  }
+                  
+                  // Process paragraph fields: replace @fieldname references with actual values reactively
+                  if (field.field_type === 'paragraph' && field.default_value) {
+                    // Get all fields from current page and all previous pages (from answers)
+                    const allFields = formData.current_page.fields
+                    const processedContent = replaceFieldReferences(
+                      field.default_value,
+                      answers,
+                      allFields
+                    )
+                    fieldWithLocalState = {
+                      ...fieldWithLocalState,
+                      default_value: processedContent
+                    }
                   }
                   
                   return (

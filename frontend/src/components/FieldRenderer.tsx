@@ -315,6 +315,21 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
           </Stack>
         )
 
+      case 'paragraph':
+        // Paragraph fields display text content (from default_value)
+        // The content may contain @fieldname references that need to be replaced
+        // For now, display the default_value as-is (backend processes it)
+        // Real-time updates will be handled in FormView.tsx
+        return (
+          <Text
+            size="md"
+            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+            c="dimmed"
+          >
+            {field.default_value || ''}
+          </Text>
+        )
+
       default:
         return (
           <TextInput

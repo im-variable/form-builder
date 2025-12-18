@@ -144,6 +144,14 @@ export const theme = createTheme({
         const colorHover = theme.colors[color]?.[6] || theme.colors.indigo[6]
         const colorLight = theme.colors[color]?.[0] || theme.colors.indigo[0]
         
+        // Helper to convert hex to rgba
+        const hexToRgba = (hex: string, alpha: number) => {
+          const r = parseInt(hex.slice(1, 3), 16)
+          const g = parseInt(hex.slice(3, 5), 16)
+          const b = parseInt(hex.slice(5, 7), 16)
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`
+        }
+        
         return {
           root: {
             fontWeight: 600,
@@ -153,10 +161,10 @@ export const theme = createTheme({
             ...(isFilled && {
               backgroundColor: colorValue,
               color: 'white',
-              boxShadow: `0 4px 14px 0 ${theme.fn.rgba(colorValue, 0.4)}`,
+              boxShadow: `0 4px 14px 0 ${hexToRgba(colorValue, 0.4)}`,
               '&:hover': {
                 transform: 'translateY(-2px)',
-                boxShadow: `0 6px 20px ${theme.fn.rgba(colorValue, 0.5)}`,
+                boxShadow: `0 6px 20px ${hexToRgba(colorValue, 0.5)}`,
                 backgroundColor: colorHover,
               },
               '&:active': {
@@ -365,7 +373,7 @@ export const theme = createTheme({
         bar: {
           borderRadius: theme.radius.xl,
           backgroundColor: theme.colors.indigo[5],
-          boxShadow: `0 2px 8px ${theme.fn.rgba(theme.colors.indigo[5], 0.4)}`,
+          boxShadow: `0 2px 8px rgba(99, 102, 241, 0.4)`, // indigo[5] = #6366f1 = rgb(99, 102, 241)
         },
       }),
     },
