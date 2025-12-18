@@ -195,6 +195,7 @@ class RenderedField(BaseModel):
     validation_rules: Optional[Dict[str, Any]] = None
     current_value: Optional[Union[str, int, float, bool, List[str]]] = None  # If already answered (can be various types)
     conditions: Optional[List[FieldConditionRule]] = None  # Conditions that affect this field (for frontend evaluation)
+    original_content: Optional[str] = None  # For paragraph fields: original content before processing (for frontend reactive updates)
 
 
 class RenderedPage(BaseModel):

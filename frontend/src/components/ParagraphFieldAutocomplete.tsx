@@ -26,19 +26,11 @@ export function ParagraphFieldAutocomplete({
   size = 'sm',
 }: ParagraphFieldAutocompleteProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestionPosition, setSuggestionPosition] = useState({ top: 0, left: 0 })
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
-
-  // Create a map of page IDs to page titles
-  const pageTitleMap = useMemo(() => {
-    const map: Record<number, string> = {}
-    pages.forEach((page) => {
-      map[page.id] = page.title
-    })
-    return map
-  }, [pages])
 
   // Filter suggestions based on search query
   const filteredSuggestions = useMemo(() => {
@@ -67,28 +59,35 @@ export function ParagraphFieldAutocomplete({
     // Get text after @
     const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1)
     
-    // Check if there's a space or newline after @ (means we're not in a trigger)
-    if (textAfterAt.includes(' ') || textAfterAt.includes('\n')) {
+    // Check if there's a newline after @ (means we're not in a trigger)
+    if (textAfterAt.includes('\n')) {
       return { isInTrigger: false, query: '', startPos: -1 }
     }
 
-    // Check if we're right after a complete field name (check if next char is space, newline, or end of string)
+    // Check what comes after the cursor
     const textAfterCursor = text.substring(cursorPos)
     const nextChar = textAfterCursor.length > 0 ? textAfterCursor[0] : ''
-    const isCompleteFieldName = nextChar === ' ' || nextChar === '\n' || nextChar === '' || nextChar === '@'
+    const nextTwoChars = textAfterCursor.length >= 2 ? textAfterCursor.substring(0, 2) : nextChar
     
-    // If we're right after a complete field name and not typing, don't show suggestions
+    // Clear delimiters: newline, @, double space, or end of string
+    const isCompleteFieldName = nextChar === '\n' || nextChar === '@' || nextTwoChars === '  ' || nextChar === ''
+    
+    // If we're right after a complete field name, check if it matches exactly
     if (isCompleteFieldName && textAfterAt.length > 0) {
-      // Check if this matches any field name exactly
-      const potentialFieldName = textAfterAt
-      const matchesField = allFields.some(f => f.name.toLowerCase() === potentialFieldName.toLowerCase())
-      if (matchesField && nextChar !== '@') {
+      const potentialFieldName = textAfterAt.trim()
+      const exactMatch = allFields.some(f => {
+        const nameLower = f.name.toLowerCase()
+        const potentialLower = potentialFieldName.toLowerCase()
+        return nameLower === potentialLower
+      })
+      // If exact match and not continuing to type, don't show suggestions
+      if (exactMatch && nextChar !== '@' && nextTwoChars !== '  ') {
         return { isInTrigger: false, query: '', startPos: -1 }
       }
     }
 
-    // Extract the query (text after @)
-    const query = textAfterAt.toLowerCase()
+    // Extract the query (text after @, trimmed)
+    const query = textAfterAt.trim().toLowerCase()
     return { isInTrigger: true, query, startPos: lastAtIndex }
   }
 
@@ -108,23 +107,28 @@ export function ParagraphFieldAutocomplete({
       return
     }
 
-    // Calculate position based on cursor
+    // Calculate cursor position within textarea
     const textBeforeCursor = text.substring(0, cursorPos)
     const lines = textBeforeCursor.split('\n')
     const currentLine = lines.length - 1
-    const currentLineText = lines[currentLine]
-    const column = currentLineText.length
-
-    // Approximate position (this is a simplified calculation)
-    const lineHeight = 20 // Approximate line height
-    const charWidth = 8 // Approximate character width
-    const padding = 10
-
-    const top = (currentLine + 1) * lineHeight + padding
-    const left = column * charWidth + padding
+    
+    // Get computed styles for accurate measurements
+    const computedStyle = window.getComputedStyle(textarea)
+    const lineHeight = parseFloat(computedStyle.lineHeight) || 24
+    const paddingTop = parseFloat(computedStyle.paddingTop) || 8
+    const paddingLeft = parseFloat(computedStyle.paddingLeft) || 12
+    
+    // Calculate approximate position
+    // Position dropdown below the current line
+    const top = (currentLine + 1) * lineHeight + paddingTop + 4
+    // Position dropdown at the start of the line (where @ appears)
+    const left = paddingLeft
 
     setSuggestionPosition({ top, left })
-    setShowSuggestions(true)
+    // Ensure suggestions are shown
+    if (allFields.length > 0) {
+      setShowSuggestions(true)
+    }
   }
 
   // Handle text change
@@ -139,10 +143,12 @@ export function ParagraphFieldAutocomplete({
     if (isInTrigger) {
       setSearchQuery(query)
       setSelectedIndex(0)
-      // Update suggestion position after a short delay to allow DOM update
-      setTimeout(() => {
+      // Show suggestions immediately, then update position
+      setShowSuggestions(true)
+      // Update suggestion position immediately
+      requestAnimationFrame(() => {
         updateSuggestionPosition()
-      }, 0)
+      })
     } else {
       // Not in trigger, hide suggestions
       setShowSuggestions(false)
@@ -152,6 +158,84 @@ export function ParagraphFieldAutocomplete({
 
   // Handle keydown for navigation and selection
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget
+    const cursorPos = textarea.selectionStart
+    const text = value
+    
+    // Handle backspace to remove entire field references
+    if (e.key === 'Backspace' && cursorPos > 0) {
+      const textBeforeCursor = text.substring(0, cursorPos)
+      const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+      
+      if (lastAtIndex !== -1) {
+        // Get text after @ up to cursor
+        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1).trimEnd()
+        
+        // Check if next character after cursor is space, newline, @, or end
+        const nextChar = cursorPos < text.length ? text[cursorPos] : ''
+        const isAtEndOfFieldRef = nextChar === ' ' || nextChar === '\n' || nextChar === '@' || nextChar === ''
+        
+        if (textAfterAt.length > 0 && isAtEndOfFieldRef && !textAfterAt.includes('\n') && !textAfterAt.includes('@')) {
+          // Check if this matches any known field name (case-insensitive)
+          const matchingField = allFields.find(f => {
+            const nameLower = f.name.toLowerCase()
+            const potentialLower = textAfterAt.toLowerCase()
+            return nameLower === potentialLower
+          })
+          
+          // Only delete if it matches a known field name
+          if (matchingField) {
+            // Delete the entire field reference including @
+            e.preventDefault()
+            const before = text.substring(0, lastAtIndex)
+            const after = text.substring(cursorPos)
+            onChange(before + after)
+            
+            // Set cursor position after deletion
+            setTimeout(() => {
+              if (textareaRef.current) {
+                textareaRef.current.setSelectionRange(lastAtIndex, lastAtIndex)
+                textareaRef.current.focus()
+              }
+            }, 0)
+            return
+          }
+        }
+      }
+    }
+    
+    // Handle delete key to remove entire field references
+    if (e.key === 'Delete' && cursorPos < text.length) {
+      // Check if we're right before a @ symbol
+      if (text[cursorPos] === '@') {
+        // Find where this field reference ends
+        let endIndex = cursorPos + 1
+        while (endIndex < text.length) {
+          const char = text[endIndex]
+          if (char === ' ' || char === '\n' || char === '@') {
+            break
+          }
+          endIndex++
+        }
+        
+        // Delete the entire field reference
+        e.preventDefault()
+        const before = text.substring(0, cursorPos)
+        const after = text.substring(endIndex)
+        onChange(before + after)
+        
+        // Set cursor position after deletion
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.setSelectionRange(cursorPos, cursorPos)
+            textareaRef.current.focus()
+          }
+        }, 0)
+        return
+      }
+    }
+    
+    // Handle suggestion navigation
     if (!showSuggestions || filteredSuggestions.length === 0) {
       return
     }
@@ -208,24 +292,334 @@ export function ParagraphFieldAutocomplete({
     }
   }, [value, showSuggestions])
 
+  // Sync textarea height with preview layer
+  useEffect(() => {
+    if (textareaRef.current && previewRef.current) {
+      const textarea = textareaRef.current
+      const preview = previewRef.current
+      
+      // Sync scroll position
+      const syncScroll = () => {
+        preview.scrollTop = textarea.scrollTop
+        preview.scrollLeft = textarea.scrollLeft
+      }
+      
+      textarea.addEventListener('scroll', syncScroll)
+      
+      return () => {
+        textarea.removeEventListener('scroll', syncScroll)
+      }
+    }
+  }, [value])
+
+  // Parse text and create styled parts
+  const parseTextWithFieldReferences = () => {
+    if (!value) return []
+
+    const parts: Array<{ text: string; isFieldRef: boolean; fieldName?: string }> = []
+    let lastIndex = 0
+    let i = 0
+
+    while (i < value.length) {
+      // Find next @ symbol
+      const atIndex = value.indexOf('@', i)
+      if (atIndex === -1) {
+        // No more @ symbols, add remaining text
+        if (lastIndex < value.length) {
+          parts.push({ text: value.substring(lastIndex), isFieldRef: false })
+        }
+        break
+      }
+
+      // Add text before @
+      if (atIndex > lastIndex) {
+        parts.push({ text: value.substring(lastIndex, atIndex), isFieldRef: false })
+      }
+
+      // Start searching for field name after @
+      let endIndex = atIndex + 1
+      let potentialFieldName = ''
+      let matchingField = null
+      let foundExactMatch = false
+
+      // Try to find the longest matching field name
+      while (endIndex <= value.length) {
+        const char = endIndex < value.length ? value[endIndex] : ''
+        
+        // Stop at newline or @
+        if (char === '\n' || char === '@') {
+          break
+        }
+
+        // Extract current potential field name (trim trailing spaces)
+        potentialFieldName = value.substring(atIndex + 1, endIndex).trimEnd()
+        
+        if (potentialFieldName.length === 0) {
+          endIndex++
+          continue
+        }
+
+        // Check for exact match with known field names
+        const exactMatch = allFields.find(f => {
+          const nameLower = f.name.toLowerCase()
+          const potentialLower = potentialFieldName.toLowerCase()
+          return nameLower === potentialLower
+        })
+
+        if (exactMatch) {
+          matchingField = exactMatch
+          foundExactMatch = true
+          // Check if next character is a space, newline, @, or end - if so, we found the complete field name
+          const nextChar = endIndex < value.length ? value[endIndex] : ''
+          if (nextChar === ' ' || nextChar === '\n' || nextChar === '@' || nextChar === '') {
+            // Found exact match and we're at a delimiter - use this field name
+            break
+          }
+        }
+
+        // Stop at double space (clear delimiter)
+        const nextChar = endIndex < value.length ? value[endIndex] : ''
+        const nextNextChar = endIndex + 1 < value.length ? value[endIndex + 1] : ''
+        if (nextChar === ' ' && nextNextChar === ' ') {
+          break
+        }
+
+        endIndex++
+      }
+
+      // If we found an exact match, use that field name
+      if (foundExactMatch && matchingField) {
+        const fieldNameLength = matchingField.name.length
+        const actualEndIndex = atIndex + 1 + fieldNameLength
+        
+        parts.push({
+          text: value.substring(atIndex, actualEndIndex),
+          isFieldRef: true,
+          fieldName: matchingField.name
+        })
+        
+        lastIndex = actualEndIndex
+        i = actualEndIndex
+      } else {
+        // No exact match found, use what we have (might be partial or invalid)
+        parts.push({
+          text: value.substring(atIndex, endIndex),
+          isFieldRef: true,
+          fieldName: undefined // Not a complete valid field name
+        })
+        
+        lastIndex = endIndex
+        i = endIndex
+      }
+    }
+
+    return parts.length > 0 ? parts : [{ text: value, isFieldRef: false }]
+  }
+
+  const textParts = parseTextWithFieldReferences()
+
   return (
-    <Box style={{ position: 'relative' }}>
-      <Textarea
-        ref={textareaRef}
-        label={label}
-        placeholder={placeholder}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onFocus={updateSuggestionPosition}
-        onBlur={() => {
-          // Delay hiding to allow click on suggestion
-          setTimeout(() => setShowSuggestions(false), 200)
+    <Box style={{ position: 'relative', width: '100%' }}>
+      {label && (
+        <Text size="sm" fw={500} mb={4}>
+          {label}
+          {required && <Text component="span" c="red"> *</Text>}
+        </Text>
+      )}
+      
+      {/* Container with styled preview and transparent textarea */}
+      <Box
+        style={{
+          position: 'relative',
+          width: '100%',
+          overflow: 'visible',
         }}
-        rows={rows}
-        size={size}
-        required={required}
-      />
+      >
+        {/* Styled preview layer showing field references */}
+        <Box
+          ref={previewRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #ced4da',
+            borderRadius: '4px',
+            backgroundColor: '#fff',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            fontSize: '14px',
+            lineHeight: '1.55',
+            fontFamily: 'var(--mantine-font-family)',
+            pointerEvents: 'none',
+            zIndex: 1,
+            overflow: 'visible',
+            visibility: 'visible',
+            opacity: 1,
+            letterSpacing: 'normal',
+            textAlign: 'left',
+            textIndent: 0,
+            textTransform: 'none',
+            verticalAlign: 'baseline',
+            boxSizing: 'border-box',
+          }}
+        >
+          {!value && placeholder && (
+            <Text c="dimmed" size="sm" style={{ fontStyle: 'italic' }}>
+              {placeholder}
+            </Text>
+          )}
+          {value && (
+            <Box 
+              style={{ 
+                position: 'relative', 
+                zIndex: 1,
+                margin: 0,
+                padding: 0,
+                display: 'block',
+                width: '100%',
+                minHeight: 0,
+              }}
+            >
+              {textParts.map((part, index) => {
+                if (part.isFieldRef && part.fieldName) {
+                  return (
+                    <span
+                      key={index}
+                      className="field-reference-badge"
+                      style={{
+                        color: '#6366f1',
+                        fontWeight: 'normal',
+                        fontSize: 'inherit',
+                        margin: 0,
+                        padding: 0,
+                        verticalAlign: 'baseline',
+                        lineHeight: 'inherit',
+                        position: 'relative',
+                        zIndex: 10,
+                        display: 'inline',
+                        fontFamily: 'inherit',
+                        letterSpacing: 'inherit',
+                        textShadow: '0 0 0 #6366f1',
+                        WebkitTextFillColor: '#6366f1',
+                      }}
+                    >
+                      @{part.fieldName}
+                    </span>
+                  )
+                } else if (part.isFieldRef && !part.fieldName) {
+                  // Invalid field reference - distinct styling
+                  return (
+                    <span
+                      key={index}
+                      className="field-reference"
+                      style={{
+                        color: '#868e96',
+                        fontWeight: 'inherit',
+                        fontSize: 'inherit',
+                        margin: 0,
+                        padding: 0,
+                        display: 'inline',
+                        verticalAlign: 'baseline',
+                        lineHeight: 'inherit',
+                        fontFamily: 'inherit',
+                        letterSpacing: 'inherit',
+                      }}
+                    >
+                      {part.text}
+                    </span>
+                  )
+                } else {
+                  return (
+                    <span 
+                      key={index} 
+                      style={{ 
+                        color: '#212529',
+                        margin: 0,
+                        padding: 0,
+                        display: 'inline',
+                        verticalAlign: 'baseline',
+                        lineHeight: 'inherit',
+                        fontFamily: 'inherit',
+                        letterSpacing: 'inherit',
+                      }}
+                    >
+                      {part.text}
+                    </span>
+                  )
+                }
+              })}
+            </Box>
+          )}
+        </Box>
+        
+        {/* Transparent textarea for input - positioned on top */}
+        <Textarea
+          ref={textareaRef}
+          placeholder=""
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={updateSuggestionPosition}
+          onBlur={() => {
+            setTimeout(() => setShowSuggestions(false), 200)
+          }}
+          rows={rows}
+          size={size}
+          required={required}
+          styles={{
+            wrapper: {
+              position: 'relative',
+              zIndex: 2,
+              backgroundColor: 'transparent',
+              margin: 0,
+              padding: 0,
+              border: 'none',
+              display: 'block',
+            },
+            root: {
+              backgroundColor: 'transparent',
+              margin: 0,
+              padding: 0,
+              border: 'none',
+              display: 'block',
+            },
+            input: {
+              backgroundColor: 'transparent',
+              color: 'transparent',
+              caretColor: '#212529',
+              border: '1px solid transparent',
+              padding: '8px 12px',
+              margin: 0,
+              resize: 'none',
+              boxShadow: 'none',
+              outline: 'none',
+              fontSize: '14px',
+              lineHeight: '1.55',
+              fontFamily: 'var(--mantine-font-family)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              minHeight: 'auto',
+              height: 'auto',
+              borderRadius: '4px',
+              letterSpacing: 'normal',
+              textAlign: 'left',
+              textIndent: 0,
+              textTransform: 'none',
+              verticalAlign: 'top',
+              boxSizing: 'border-box',
+              width: '100%',
+              display: 'block',
+            }
+          }}
+          style={{
+            backgroundColor: 'transparent',
+          }}
+        />
+      </Box>
 
       {showSuggestions && filteredSuggestions.length > 0 && (
         <Paper
@@ -233,13 +627,14 @@ export function ParagraphFieldAutocomplete({
           p="xs"
           style={{
             position: 'absolute',
-            top: suggestionPosition.top,
-            left: suggestionPosition.left,
-            zIndex: 1000,
+            top: `${suggestionPosition.top}px`,
+            left: `${suggestionPosition.left}px`,
+            zIndex: 10000,
             maxHeight: '300px',
             overflowY: 'auto',
             minWidth: '300px',
             maxWidth: '400px',
+            backgroundColor: 'white',
           }}
           onMouseDown={(e) => e.preventDefault()} // Prevent blur
         >

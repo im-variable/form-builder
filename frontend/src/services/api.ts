@@ -58,6 +58,7 @@ export interface Field {
   validation_rules?: Record<string, any>
   current_value?: string
   conditions?: FieldConditionRule[]  // Conditions for frontend evaluation
+  original_content?: string  // For paragraph fields: original content before processing
 }
 
 export interface RenderedPage {

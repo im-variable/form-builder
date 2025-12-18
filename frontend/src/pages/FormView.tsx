@@ -32,6 +32,12 @@ function FormView() {
   const [submissionId, setSubmissionId] = useState<number | null>(null)
   const currentPageIdRef = useRef<number | null>(null)
   
+  // Store all fields from all visited pages (for paragraph field reference replacement)
+  const [allFieldsMap, setAllFieldsMap] = useState<Record<string, Field>>({})
+  
+  // Store original paragraph content (before backend processing) for reactive updates
+  const originalParagraphContentRef = useRef<Record<number, string>>({})
+  
   // Local field visibility state for same-page conditions
   const [localFieldVisibility, setLocalFieldVisibility] = useState<Record<number, boolean>>({})
   const [localFieldRequired, setLocalFieldRequired] = useState<Record<number, boolean>>({})
@@ -99,16 +105,42 @@ function FormView() {
       setFormData(data)
       currentPageIdRef.current = data.current_page.id
 
+      // Get all answers from backend (includes answers from all pages)
+      // This might return empty object for new submissions, which is fine
+      let allAnswersFromBackend: Record<string, any> = {}
+      try {
+        allAnswersFromBackend = await formAPI.getSubmissionResponses(newSessionId) || {}
+      } catch (err: any) {
+        // If 404 or other error, just use empty object (submission might not have responses yet)
+        console.warn('Could not fetch submission responses:', err)
+        allAnswersFromBackend = {}
+      }
+      
+      // Convert response format to simple field_name -> value mapping
+      const answersDict: Record<string, any> = {}
+      if (allAnswersFromBackend && typeof allAnswersFromBackend === 'object') {
+        Object.keys(allAnswersFromBackend).forEach((fieldName) => {
+          const responseData = allAnswersFromBackend[fieldName]
+          // Handle both formats: simple value or object with value property
+          if (responseData && typeof responseData === 'object' && 'value' in responseData) {
+            answersDict[fieldName] = responseData.value
+          } else {
+            answersDict[fieldName] = responseData
+          }
+        })
+      }
+      
       // Initialize answers for all fields on the current page
       // Include all fields (even empty ones) so condition evaluation works correctly for same-page fields
-      const initialAnswers: Record<string, any> = {}
+      const initialAnswers: Record<string, any> = { ...answersDict }
       const initialVisibility: Record<number, boolean> = {}
       const initialRequired: Record<number, boolean> = {}
       
       data.current_page.fields.forEach((field) => {
-        if (field.current_value !== undefined && field.current_value !== null) {
+        // Use current_value from field if available, otherwise use value from allAnswersFromBackend
+        if (field.current_value !== undefined && field.current_value !== null && field.current_value !== '') {
           initialAnswers[field.name] = field.current_value
-        } else {
+        } else if (!(field.name in initialAnswers)) {
           // Initialize empty fields as empty string so IS_EMPTY conditions can evaluate
           initialAnswers[field.name] = ""
         }
@@ -116,6 +148,19 @@ function FormView() {
         // Initialize visibility and required from backend (conditions already evaluated)
         initialVisibility[field.id] = field.is_visible
         initialRequired[field.id] = field.is_required
+        
+        // Store field in allFieldsMap for paragraph reference replacement
+        setAllFieldsMap((prev) => ({ ...prev, [field.name]: field }))
+        
+        // Store original paragraph content for reactive processing
+        if (field.field_type === 'paragraph') {
+          if (field.original_content) {
+            originalParagraphContentRef.current[field.id] = field.original_content
+          } else if (field.default_value) {
+            // Fallback: if original_content not available, use default_value (might be processed, but better than nothing)
+            originalParagraphContentRef.current[field.id] = field.default_value
+          }
+        }
       })
       
       setAnswers(initialAnswers)
@@ -151,25 +196,64 @@ function FormView() {
       setFormData(updatedForm)
       currentPageIdRef.current = updatedForm.current_page.id
 
+      // Get all answers from backend (includes answers from all pages including checkbox values)
+      let allAnswersFromBackend: Record<string, any> = {}
+      try {
+        allAnswersFromBackend = await formAPI.getSubmissionResponses(sessionId) || {}
+      } catch (err: any) {
+        // If error, just use empty object
+        console.warn('Could not fetch submission responses:', err)
+        allAnswersFromBackend = {}
+      }
+      
+      // Convert response format to simple field_name -> value mapping
+      const answersDict: Record<string, any> = {}
+      if (allAnswersFromBackend && typeof allAnswersFromBackend === 'object') {
+        Object.keys(allAnswersFromBackend).forEach((fieldName) => {
+          const responseData = allAnswersFromBackend[fieldName]
+          // Handle both formats: simple value or object with value property
+          if (responseData && typeof responseData === 'object' && 'value' in responseData) {
+            answersDict[fieldName] = responseData.value
+          } else {
+            answersDict[fieldName] = responseData
+          }
+        })
+      }
+
       // Initialize answers for the previous page
-      const newAnswers: Record<string, any> = {}
+      // Merge with all answers from backend to keep values from all pages
+      const newAnswers: Record<string, any> = { ...answersDict }
       const newVisibility: Record<number, boolean> = {}
       const newRequired: Record<number, boolean> = {}
       
-      updatedForm.current_page.fields.forEach((field) => {
-        if (field.current_value !== undefined && field.current_value !== null && field.current_value !== '') {
-          newAnswers[field.name] = field.current_value
-        } else {
-          newAnswers[field.name] = ""
-        }
+        updatedForm.current_page.fields.forEach((field) => {
+          // Use current_value from field if available, otherwise keep value from allAnswersFromBackend
+          if (field.current_value !== undefined && field.current_value !== null && field.current_value !== '') {
+            newAnswers[field.name] = field.current_value
+          } else if (!(field.name in newAnswers)) {
+            newAnswers[field.name] = ""
+          }
+          
+          newVisibility[field.id] = field.is_visible
+          newRequired[field.id] = field.is_required
+          
+          // Store field in allFieldsMap for paragraph reference replacement
+          setAllFieldsMap((prev) => ({ ...prev, [field.name]: field }))
+          
+          // Store original paragraph content for reactive processing
+          if (field.field_type === 'paragraph') {
+            if (field.original_content) {
+              originalParagraphContentRef.current[field.id] = field.original_content
+            } else if (field.default_value) {
+              // Fallback: if original_content not available, use default_value
+              originalParagraphContentRef.current[field.id] = field.default_value
+            }
+          }
+        })
         
-        newVisibility[field.id] = field.is_visible
-        newRequired[field.id] = field.is_required
-      })
-      
-      setAnswers(newAnswers)
-      setLocalFieldVisibility(newVisibility)
-      setLocalFieldRequired(newRequired)
+        setAnswers(newAnswers)
+        setLocalFieldVisibility(newVisibility)
+        setLocalFieldRequired(newRequired)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load previous page')
       console.error('Error loading previous page:', err)
@@ -222,14 +306,82 @@ function FormView() {
         return
       }
 
+      // Get all answers from backend first (includes answers from all pages)
+      // This ensures we have all field values for paragraph replacement
+      let backendAnswersForSubmit: Record<string, any> = {}
+      try {
+        backendAnswersForSubmit = await formAPI.getSubmissionResponses(sessionId) || {}
+      } catch (err: any) {
+        console.warn('Could not fetch submission responses before submit:', err)
+        backendAnswersForSubmit = {}
+      }
+      
+      // Convert response format to simple field_name -> value mapping
+      const backendAnswersDict: Record<string, any> = {}
+      if (backendAnswersForSubmit && typeof backendAnswersForSubmit === 'object') {
+        Object.keys(backendAnswersForSubmit).forEach((fieldName) => {
+          const responseData = backendAnswersForSubmit[fieldName]
+          if (responseData && typeof responseData === 'object' && 'value' in responseData) {
+            backendAnswersDict[fieldName] = responseData.value
+          } else {
+            backendAnswersDict[fieldName] = responseData
+          }
+        })
+      }
+      
+      // Merge current page answers with backend answers (current answers take priority)
+      const mergedAnswersForSubmission: Record<string, any> = { ...backendAnswersDict, ...answers }
+      
       // Submit answers for all visible fields
       for (const field of visibleFields) {
-        const value = answers[field.name]
-        if (value !== undefined && value !== null && value !== '') {
+        let valueToSubmit: any = null
+        
+        if (field.field_type === 'paragraph') {
+          // For paragraph fields, submit the processed content (with @fieldname references replaced)
+          // This allows paragraph content to appear in submission responses
+          const originalContent = originalParagraphContentRef.current[field.id] || field.original_content || field.default_value || ''
+          if (originalContent) {
+            // Collect all fields from allFieldsMap and current page fields
+            // This ensures we have field definitions (including options) for all referenced fields
+            const fieldsFromMap = Object.values(allFieldsMap)
+            const currentPageFields = formData.current_page.fields
+            // Combine and deduplicate by field name (current page fields take priority)
+            const allFieldsMapByName: Record<string, Field> = {}
+            fieldsFromMap.forEach(f => {
+              allFieldsMapByName[f.name] = f
+            })
+            currentPageFields.forEach(f => {
+              allFieldsMapByName[f.name] = f
+            })
+            const allFields = Object.values(allFieldsMapByName)
+            
+            console.log('[handleSubmit] Processing paragraph field:', {
+              fieldId: field.id,
+              fieldName: field.name,
+              originalContent,
+              allFieldsCount: allFields.length,
+              allFieldNames: allFields.map(f => f.name),
+              mergedAnswersKeys: Object.keys(mergedAnswersForSubmission),
+              mergedAnswers: mergedAnswersForSubmission
+            })
+            const processedContent = replaceFieldReferences(originalContent, mergedAnswersForSubmission, allFields)
+            console.log('[handleSubmit] Processed paragraph content:', {
+              original: originalContent,
+              processed: processedContent
+            })
+            valueToSubmit = processedContent
+          }
+        } else {
+          // For other fields, use the value from answers
+          valueToSubmit = answers[field.name]
+        }
+        
+        // Submit if value exists (for paragraph fields, submit even if empty string to record that it was displayed)
+        if (field.field_type === 'paragraph' || (valueToSubmit !== undefined && valueToSubmit !== null && valueToSubmit !== '')) {
           const submitData: SubmitAnswerRequest = {
             session_id: sessionId,
             field_id: field.id,
-            value: value,
+            value: valueToSubmit || '',
           }
           await formAPI.submitAnswer(submitData)
         }
@@ -238,6 +390,30 @@ function FormView() {
       // After submitting, render form again to get the next page
       // Don't pass answers - let it get from database to ensure we have the latest state
       const updatedForm = await formAPI.renderForm(parseInt(formId!), sessionId)
+      
+      // Get all answers from backend (includes answers from all pages including checkbox values)
+      let allAnswersAfterSubmit: Record<string, any> = {}
+      try {
+        allAnswersAfterSubmit = await formAPI.getSubmissionResponses(sessionId) || {}
+      } catch (err: any) {
+        // If error, just use empty object
+        console.warn('Could not fetch submission responses:', err)
+        allAnswersAfterSubmit = {}
+      }
+      
+      // Convert response format to simple field_name -> value mapping
+      const answersDict: Record<string, any> = {}
+      if (allAnswersAfterSubmit && typeof allAnswersAfterSubmit === 'object') {
+        Object.keys(allAnswersAfterSubmit).forEach((fieldName) => {
+          const responseData = allAnswersAfterSubmit[fieldName]
+          // Handle both formats: simple value or object with value property
+          if (responseData && typeof responseData === 'object' && 'value' in responseData) {
+            answersDict[fieldName] = responseData.value
+          } else {
+            answersDict[fieldName] = responseData
+          }
+        })
+      }
 
       if (updatedForm.is_complete) {
         await formAPI.completeSubmission(sessionId)
@@ -251,15 +427,16 @@ function FormView() {
         
         
         // Initialize answers for the new page
-        // Include all fields (even empty ones) so condition evaluation works correctly
-        const newAnswers: Record<string, any> = {}
+        // Merge with all answers from backend to keep values from all pages
+        const newAnswers: Record<string, any> = { ...answersDict }
         const newVisibility: Record<number, boolean> = {}
         const newRequired: Record<number, boolean> = {}
         
         updatedForm.current_page.fields.forEach((field) => {
-          if (field.current_value !== undefined && field.current_value !== null) {
+          // Use current_value from field if available, otherwise keep value from allAnswersFromBackend
+          if (field.current_value !== undefined && field.current_value !== null && field.current_value !== '') {
             newAnswers[field.name] = field.current_value
-          } else {
+          } else if (!(field.name in newAnswers)) {
             // Initialize empty fields as empty string so IS_EMPTY conditions can evaluate
             newAnswers[field.name] = ""
           }
@@ -267,6 +444,19 @@ function FormView() {
           // Initialize visibility and required from backend (conditions already evaluated)
           newVisibility[field.id] = field.is_visible
           newRequired[field.id] = field.is_required
+          
+          // Store field in allFieldsMap for paragraph reference replacement
+          setAllFieldsMap((prev) => ({ ...prev, [field.name]: field }))
+          
+          // Store original paragraph content for reactive processing
+          if (field.field_type === 'paragraph') {
+            if (field.original_content) {
+              originalParagraphContentRef.current[field.id] = field.original_content
+            } else if (field.default_value) {
+              // Fallback: if original_content not available, use default_value
+              originalParagraphContentRef.current[field.id] = field.default_value
+            }
+          }
         })
         
         setAnswers(newAnswers)
@@ -410,17 +600,36 @@ function FormView() {
                   }
                   
                   // Process paragraph fields: replace @fieldname references with actual values reactively
-                  if (field.field_type === 'paragraph' && field.default_value) {
-                    // Get all fields from current page and all previous pages (from answers)
-                    const allFields = formData.current_page.fields
-                    const processedContent = replaceFieldReferences(
-                      field.default_value,
-                      answers,
-                      allFields
-                    )
-                    fieldWithLocalState = {
-                      ...fieldWithLocalState,
-                      default_value: processedContent
+                  // Always process on frontend to ensure we have access to all answers and field options
+                  if (field.field_type === 'paragraph') {
+                    // Priority: 1) original_content from ref, 2) field.original_content, 3) field.default_value (might be processed)
+                    let originalContent = originalParagraphContentRef.current[field.id] || field.original_content || field.default_value || ''
+                    
+                    // If we don't have original_content, try to extract it from default_value
+                    // by checking if it contains @fieldname patterns that weren't replaced
+                    if (!originalContent && field.default_value) {
+                      // Check if default_value still has @fieldname patterns (means backend didn't process it fully)
+                      const hasUnprocessedPatterns = /@\w+/.test(field.default_value)
+                      if (hasUnprocessedPatterns) {
+                        originalContent = field.default_value
+                      }
+                    }
+                    
+                    if (originalContent) {
+                      // Use allFieldsMap which contains fields from all visited pages with their options
+                      // This ensures checkbox/radio options are available for fields from other pages
+                      const allFields = Object.values(allFieldsMap)
+                      
+                      const processedContent = replaceFieldReferences(
+                        originalContent,
+                        answers,
+                        allFields
+                      )
+                      
+                      fieldWithLocalState = {
+                        ...fieldWithLocalState,
+                        default_value: processedContent
+                      }
                     }
                   }
                   

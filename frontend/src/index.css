@@ -98,3 +98,16 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
+
+/* Field reference badge styling */
+.field-reference-badge {
+  color: #6366f1 !important;
+  font-weight: normal !important;
+  font-size: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  vertical-align: baseline !important;
+  line-height: inherit !important;
+  position: relative !important;
+  z-index: 10 !important;
+}

@@ -76,9 +76,8 @@ def complete_submission(session_id: str, db: Session = Depends(get_db)):
 def get_submission_responses(session_id: str, db: Session = Depends(get_db)):
     """Get all responses for a submission"""
     responses = SubmissionService.get_submission_responses(db, session_id)
-    if not responses:
-        raise HTTPException(status_code=404, detail="Submission not found or no responses")
-    return responses
+    # Return empty dict if no responses (submission might exist but have no answers yet)
+    return responses if responses else {}
 
 
 @router.delete("/{submission_id}/delete")

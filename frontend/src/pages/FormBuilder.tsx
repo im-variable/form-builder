@@ -30,9 +30,10 @@ import {
   Image,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter, IconUpload, IconX, IconPhoto, IconVideo, IconMusic } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconAlertCircle, IconEdit, IconArrowUp, IconArrowDown, IconEye, IconPin, IconRoute, IconPlayerPlay, IconFilter, IconUpload, IconX, IconPhoto, IconVideo, IconMusic, IconFileText } from '@tabler/icons-react'
 import { builderAPI, uploadAPI, Form, Page, Field } from '../services/api'
 import { ParagraphFieldAutocomplete } from '../components/ParagraphFieldAutocomplete'
+import { convertFieldIdsToNames, convertFieldNamesToIds } from '../utils/fieldReferenceConverter'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
@@ -60,7 +61,7 @@ function FormBuilder() {
   const [pages, setPages] = useState<Page[]>([])
   const [currentPage, setCurrentPage] = useState<Page | null>(null)
   const [fields, setFields] = useState<Field[]>([])
-  const [allFields, setAllFields] = useState<Array<Field & { pageTitle?: string }>>([])
+  const [allFields, setAllFields] = useState<Array<Field & { pageTitle?: string; pageOrder?: number; pageId?: number }>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -335,14 +336,17 @@ function FormBuilder() {
   const loadAllFields = async (pagesList: Page[]) => {
     if (!currentForm) return
     try {
-      const fieldsWithPages: Array<Field & { pageTitle?: string }> = []
+      const fieldsWithPages: Array<Field & { pageTitle?: string; pageOrder?: number; pageId?: number }> = []
       
+      // Load fields from all pages (we'll filter when displaying)
       for (const page of pagesList) {
         try {
           const pageFields = await builderAPI.getFields(page.id)
           const fieldsWithPageInfo = pageFields.map((field) => ({
             ...field,
             pageTitle: page.title,
+            pageOrder: page.order,
+            pageId: page.id,
           }))
           fieldsWithPages.push(...fieldsWithPageInfo)
         } catch (err) {
@@ -717,6 +721,7 @@ function FormBuilder() {
       setNewChoiceLabel('')
       setRatingMin(1)
       setRatingMax(5)
+      setParagraphContent('')
       setAttachmentType('')
       setAttachmentFileUrl('')
       setAttachmentUrlInput('')
@@ -843,6 +848,16 @@ function FormBuilder() {
     }
     if (field.options?.max !== undefined) {
       setRatingMax(field.options.max)
+    }
+
+    // Set paragraph content for paragraph fields
+    if (field.field_type === 'paragraph') {
+      // Convert @#fieldid to @fieldname for UI display
+      const contentFromDB = field.default_value || ''
+      const contentForDisplay = convertFieldIdsToNames(contentFromDB, allFields)
+      setParagraphContent(contentForDisplay)
+    } else {
+      setParagraphContent('')
     }
   }
 
@@ -993,8 +1008,10 @@ function FormBuilder() {
         }
         
         // Add default_value for paragraph fields (required for paragraph type)
+        // Convert @fieldname to @#fieldid for database storage
         if (fieldType === 'paragraph') {
-          updateData.default_value = paragraphContent ? paragraphContent.trim() : ''
+          const contentToSave = paragraphContent ? paragraphContent.trim() : ''
+          updateData.default_value = convertFieldNamesToIds(contentToSave, allFields)
         }
         
         const updatedField = await builderAPI.updateField(editingFieldId, updateData)
@@ -1028,8 +1045,10 @@ function FormBuilder() {
           fieldData.options = parsedOptions
         }
         // Add default_value for paragraph fields (required for paragraph type)
+        // Convert @fieldname to @#fieldid for database storage
         if (fieldType === 'paragraph') {
-          fieldData.default_value = paragraphContent ? paragraphContent.trim() : ''
+          const contentToSave = paragraphContent ? paragraphContent.trim() : ''
+          fieldData.default_value = convertFieldNamesToIds(contentToSave, allFields)
         }
         
         console.log('Creating field with data:', fieldData)
@@ -1045,11 +1064,6 @@ function FormBuilder() {
     } catch (err: any) {
       console.error('Error creating/updating field:', err)
       console.error('Error response:', err.response?.data)
-      if (editingFieldId) {
-        console.error('Update data:', updateData)
-      } else {
-        console.error('Create data:', fieldData)
-      }
       
       // Handle validation errors (422) - FastAPI returns array of errors
       if (err.response?.status === 422 && err.response?.data?.detail) {
@@ -1784,22 +1798,73 @@ function FormBuilder() {
 
                 {/* Paragraph content */}
                 {fieldType === 'paragraph' && (
-                  <Paper p="sm" withBorder>
-                    <ParagraphFieldAutocomplete
-                      label="Paragraph Content"
-                      placeholder="Type @ to see field suggestions. Use @fieldname to reference other fields (e.g., Hi @email, your password is @password)"
-                      value={paragraphContent}
-                      onChange={setParagraphContent}
-                      pages={pages}
-                      allFields={allFields}
-                      rows={6}
-                      size="sm"
-                      required
-                    />
-                    <Text size="xs" c="dimmed" mt="xs">
-                      Type <Text component="span" fw={600}>@</Text> to see autocomplete suggestions with field names and page information. 
-                      References can be from the same page or different pages.
-                    </Text>
+                  <Paper 
+                    p="lg" 
+                    withBorder 
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderColor: '#6366f1',
+                      borderWidth: 2,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Stack gap="md">
+                      <Group gap="xs" align="center">
+                        <IconFileText size={20} style={{ color: '#6366f1' }} />
+                        <Text fw={600} size="md" style={{ color: '#1e293b' }}>
+                          Paragraph Content
+                        </Text>
+                        <Badge color="indigo" variant="light" size="sm">
+                          Dynamic Content
+                        </Badge>
+                      </Group>
+                      
+                      <Paper 
+                        p="md" 
+                        withBorder 
+                        style={{
+                          backgroundColor: 'white',
+                          borderColor: '#e2e8f0',
+                        }}
+                      >
+                        <ParagraphFieldAutocomplete
+                          label=""
+                          placeholder="Type @ to see field suggestions. Use @fieldname to reference other fields (e.g., Hi @email, your password is @password)"
+                          value={paragraphContent}
+                          onChange={setParagraphContent}
+                          pages={pages}
+                          allFields={allFields.filter((field) => {
+                            // Only show fields from previous pages and current page (not future pages)
+                            if (!currentPage) return true // If no current page selected, show all
+                            
+                            // Find the page this field belongs to
+                            const fieldPage = pages.find(p => p.id === field.pageId || p.title === field.pageTitle)
+                            if (!fieldPage) return true // If page not found, include it (shouldn't happen)
+                            
+                            const currentPageOrder = currentPage.order || 0
+                            const fieldPageOrder = fieldPage.order || 0
+                            
+                            // Include if field's page order is <= current page order (previous pages + current page)
+                            return fieldPageOrder <= currentPageOrder
+                          })}
+                          rows={8}
+                          size="md"
+                          required
+                        />
+                      </Paper>
+                      
+                      <Group gap="xs" align="flex-start">
+                        <IconAlertCircle size={16} style={{ color: '#6366f1', marginTop: 2 }} />
+                        <Stack gap={4} style={{ flex: 1 }}>
+                          <Text size="sm" c="dimmed">
+                            Type <Text component="span" fw={600} c="indigo">@</Text> to see autocomplete suggestions with field names and page information.
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            References can be from the same page or different pages. Field references will be replaced with actual values when users fill out the form.
+                          </Text>
+                        </Stack>
+                      </Group>
+                    </Stack>
                   </Paper>
                 )}
 

@@ -115,16 +115,12 @@ class SubmissionService:
             joinedload(FieldResponse.field)
         ).filter(FieldResponse.submission_id == submission.id).all()
         
+        # Return simple field_name -> value mapping for easier use in frontend
         result = {}
         for response in responses:
             field = response.field
-            result[field.name] = {
-                "field_id": field.id,
-                "label": field.label,
-                "value": response.value,
-                "field_type": field.field_type.value,
-                "options": field.options  # Include options for attachments
-            }
+            # Return the value directly (checkbox values are comma-separated strings)
+            result[field.name] = response.value
         
         return result
 

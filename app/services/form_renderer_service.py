@@ -58,6 +58,43 @@ def replace_field_references(text: str, answers: Dict[str, Any], db: Session, fo
                 display_value = str(value)  # Date format as stored
             elif field.field_type == FieldType.DATETIME:
                 display_value = str(value)  # DateTime format as stored
+            elif field.field_type in [FieldType.CHECKBOX, FieldType.MULTISELECT]:
+                # Parse comma-separated string back to list
+                if isinstance(value, str) and value and value.strip():
+                    value_list = [v.strip() for v in value.split(",") if v.strip()]
+                elif isinstance(value, list):
+                    value_list = [str(v) for v in value if v]
+                elif value:
+                    value_list = [str(value)]
+                else:
+                    value_list = []
+                
+                if not value_list:
+                    display_value = ""
+                else:
+                    # Map values to display labels if options exist
+                    if field.options and isinstance(field.options, dict) and "choices" in field.options:
+                        choices_map = {}
+                        for choice in field.options["choices"]:
+                            if isinstance(choice, dict):
+                                choice_value = choice.get("value")
+                                choice_label = choice.get("label", choice_value)
+                                if choice_value is not None:
+                                    choices_map[str(choice_value)] = str(choice_label) if choice_label else str(choice_value)
+                        
+                        display_labels = [choices_map.get(str(v), str(v)) for v in value_list]
+                        display_value = ", ".join(display_labels) if display_labels else ", ".join(str(v) for v in value_list)
+                    else:
+                        display_value = ", ".join(str(v) for v in value_list)
+            elif field.field_type in [FieldType.RADIO, FieldType.SELECT]:
+                # Map value to display label if options exist
+                value_str = str(value)
+                if field.options and "choices" in field.options:
+                    choices_map = {choice.get("value"): choice.get("label", choice.get("value")) 
+                                 for choice in field.options["choices"]}
+                    display_value = choices_map.get(value_str, value_str)
+                else:
+                    display_value = value_str
             elif isinstance(value, list):
                 display_value = ", ".join(str(v) for v in value)
             else:
@@ -290,7 +327,10 @@ class FormRendererService:
             # Process paragraph fields: replace @fieldname references with actual values
             processed_default_value = field.default_value
             processed_help_text = field.help_text
+            original_content = None  # Store original for frontend reactive processing
             if field.field_type == FieldType.PARAGRAPH:
+                # Store original content before processing
+                original_content = processed_default_value
                 # Process default_value (paragraph content) to replace field references
                 if processed_default_value:
                     processed_default_value = replace_field_references(
@@ -335,7 +375,8 @@ class FormRendererService:
                 options=field.options,
                 validation_rules=field.validation_rules,
                 current_value=current_value,
-                conditions=field_conditions if field_conditions else None
+                conditions=field_conditions if field_conditions else None,
+                original_content=original_content  # Store original for paragraph fields
             )
             rendered_fields.append(rendered_field)
 
@@ -505,7 +546,10 @@ class FormRendererService:
                     # Process paragraph fields: replace @fieldname references with actual values
                     processed_default_value = field.default_value
                     processed_help_text = field.help_text
+                    original_content = None  # Store original for frontend reactive processing
                     if field.field_type == FieldType.PARAGRAPH:
+                        # Store original content before processing
+                        original_content = processed_default_value
                         if processed_default_value:
                             processed_default_value = replace_field_references(
                                 processed_default_value,
@@ -546,7 +590,8 @@ class FormRendererService:
                         options=field.options,
                         validation_rules=field.validation_rules,
                         current_value=current_value,
-                        conditions=field_conditions if field_conditions else None
+                        conditions=field_conditions if field_conditions else None,
+                        original_content=original_content  # Store original for paragraph fields
                     )
                     rendered_fields.append(rendered_field)
                 
@@ -721,7 +766,10 @@ class FormRendererService:
             # Process paragraph fields: replace @fieldname references with actual values
             processed_default_value = field.default_value
             processed_help_text = field.help_text
+            original_content = None  # Store original for frontend reactive processing
             if field.field_type == FieldType.PARAGRAPH:
+                # Store original content before processing
+                original_content = processed_default_value
                 if processed_default_value:
                     processed_default_value = replace_field_references(
                         processed_default_value,
@@ -763,7 +811,8 @@ class FormRendererService:
                 options=field.options,
                 validation_rules=field.validation_rules,
                 current_value=current_value,
-                conditions=field_conditions if field_conditions else None
+                conditions=field_conditions if field_conditions else None,
+                original_content=original_content  # Store original for paragraph fields
             )
             rendered_fields.append(rendered_field)
         
