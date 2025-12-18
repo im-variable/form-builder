@@ -624,25 +624,24 @@ export function ParagraphFieldAutocomplete({
       {showSuggestions && filteredSuggestions.length > 0 && (
         <Paper
           shadow="md"
-          p="xs"
+          p={4}
           style={{
             position: 'absolute',
             top: `${suggestionPosition.top}px`,
             left: `${suggestionPosition.left}px`,
             zIndex: 10000,
-            maxHeight: '300px',
+            maxHeight: '180px',
             overflowY: 'auto',
-            minWidth: '300px',
-            maxWidth: '400px',
+            width: 'auto',
             backgroundColor: 'white',
           }}
           onMouseDown={(e) => e.preventDefault()} // Prevent blur
         >
-          <Stack gap={2}>
+          <Stack gap={1}>
             {filteredSuggestions.map((field, index) => (
               <Paper
                 key={field.id}
-                p="xs"
+                p={4}
                 style={{
                   cursor: 'pointer',
                   backgroundColor: index === selectedIndex ? 'var(--mantine-color-blue-0)' : 'transparent',
@@ -653,10 +652,10 @@ export function ParagraphFieldAutocomplete({
                   insertSuggestion(field)
                 }}
               >
-                <Group justify="space-between" gap="xs">
-                  <Stack gap={2}>
-                    <Group gap="xs">
-                      <Text size="sm" fw={500}>
+                <Group justify="space-between" gap="xs" wrap="nowrap">
+                  <Stack gap={1} style={{ flex: 1, minWidth: 0 }}>
+                    <Group gap="xs" wrap="nowrap">
+                      <Text size="xs" fw={500}>
                         @{field.name}
                       </Text>
                       <Badge size="xs" variant="light" color="blue">
@@ -667,7 +666,7 @@ export function ParagraphFieldAutocomplete({
                       {field.label}
                     </Text>
                   </Stack>
-                  <Badge size="xs" variant="outline" color="gray">
+                  <Badge size="xs" variant="outline" color="gray" style={{ flexShrink: 0 }}>
                     {field.pageTitle}
                   </Badge>
                 </Group>
