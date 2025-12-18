@@ -1051,7 +1051,6 @@ function FormBuilder() {
           fieldData.default_value = convertFieldNamesToIds(contentToSave, allFields)
         }
         
-        console.log('Creating field with data:', fieldData)
         const field = await builderAPI.createField(fieldData)
 
         setFields([...fields, field])
@@ -1832,7 +1831,6 @@ function FormBuilder() {
                           placeholder="Type @ to see field suggestions. Use @fieldname to reference other fields (e.g., Hi @email, your password is @password)"
                           value={paragraphContent}
                           onChange={setParagraphContent}
-                          pages={pages}
                           allFields={allFields.filter((field) => {
                             // Only show fields from previous pages and current page (not future pages)
                             if (!currentPage) return true // If no current page selected, show all

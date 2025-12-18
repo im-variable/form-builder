@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Textarea, Paper, Stack, Text, Group, Badge, Box } from '@mantine/core'
-import { Field, Page } from '../services/api'
+import { Field } from '../services/api'
 
 interface ParagraphFieldAutocompleteProps {
   value: string
   onChange: (value: string) => void
-  pages: Page[]
   allFields: Array<Field & { pageTitle?: string }>
   placeholder?: string
   label?: string
@@ -17,7 +16,6 @@ interface ParagraphFieldAutocompleteProps {
 export function ParagraphFieldAutocomplete({
   value,
   onChange,
-  pages,
   allFields,
   placeholder,
   label,

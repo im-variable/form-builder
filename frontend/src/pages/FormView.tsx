@@ -355,20 +355,7 @@ function FormView() {
             })
             const allFields = Object.values(allFieldsMapByName)
             
-            console.log('[handleSubmit] Processing paragraph field:', {
-              fieldId: field.id,
-              fieldName: field.name,
-              originalContent,
-              allFieldsCount: allFields.length,
-              allFieldNames: allFields.map(f => f.name),
-              mergedAnswersKeys: Object.keys(mergedAnswersForSubmission),
-              mergedAnswers: mergedAnswersForSubmission
-            })
             const processedContent = replaceFieldReferences(originalContent, mergedAnswersForSubmission, allFields)
-            console.log('[handleSubmit] Processed paragraph content:', {
-              original: originalContent,
-              processed: processedContent
-            })
             valueToSubmit = processedContent
           }
         } else {

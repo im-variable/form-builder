@@ -38,16 +38,6 @@ export function replaceFieldReferences(
 
   let result = text
   
-  // Debug: Log input parameters
-  console.log('[replaceFieldReferences] Input:', {
-    text,
-    answersKeys: Object.keys(answers),
-    answers,
-    fieldsCount: fields.length,
-    fieldNames: fields.map(f => f.name),
-    fieldIds: fields.map(f => f.id).filter(id => id !== undefined)
-  })
-  
   // Helper function to format field value
   const formatFieldValue = (
     value: any,
@@ -126,7 +116,6 @@ export function replaceFieldReferences(
     const field = fieldByIdMap[fieldId]
     
     if (!field) {
-      console.warn(`[replaceFieldReferences] Field ID ${fieldId} not found in fieldByIdMap`)
       return
     }
     
@@ -136,7 +125,6 @@ export function replaceFieldReferences(
     
     if (value === undefined || value === null) {
       // Field found but no value - replace with N/A
-      console.log(`[replaceFieldReferences] Field "${fieldName}" (ID: ${fieldId}) found but no value in answers. Replacing with N/A.`)
       result = result.replace(new RegExp(`@#${fieldIdStr}`, 'g'), 'N/A')
       return
     }
@@ -154,7 +142,6 @@ export function replaceFieldReferences(
     // Check if field exists in answers
     if (!(fieldName in answers)) {
       // Field not found in answers - leave placeholder as is
-      console.warn(`[replaceFieldReferences] Field "${fieldName}" not found in answers. Available:`, Object.keys(answers))
       return
     }
 
@@ -162,7 +149,6 @@ export function replaceFieldReferences(
     const field = fieldByNameMap[fieldName]
     
     if (!field) {
-      console.warn(`[replaceFieldReferences] Field "${fieldName}" not found in fieldByNameMap`)
       return
     }
     
